@@ -1,0 +1,7 @@
+.env
+config/*.json
+/tmp/*
+database.go
+book-world-b0429-firebase-adminsdk-fbsvc-31c7b10de9.json
+database.go
+firebase.go
