@@ -14,6 +14,7 @@ func v1Routes(g *echo.Group, h AppModel) {
 	auth.POST("/resend-otp", h.Auth.ResendOTP)
 	auth.POST("/verify-otp", h.Auth.VerifyOTP)
 	auth.POST("/login", h.Auth.LoginUser)
+	auth.GET("/validate", h.Auth.ValidateSession, middleware.JWTVerify())
 	auth.GET("/logout", h.Auth.UserLogOut, middleware.JWTVerify())
 	auth.GET("/github/callback", h.Auth.GithubOAuthCallback, middleware.JWTVerify())
 
@@ -42,6 +43,9 @@ func v1Routes(g *echo.Group, h AppModel) {
 	workspace.POST("/add_user", h.Workspace.AddUserInWorkspace)
 	workspace.POST("/getall_workspace", h.Workspace.GetAllWorkspace)
 	workspace.GET("/get_repo", h.Workspace.GetAllRepository)
+	workspace.GET("/get_org_details", h.Workspace.GetOrgDetails)
+	workspace.GET("/get_repo_commits/:repo_id", h.Workspace.GetRepoCommits)
+	workspace.GET("/get_commit_details/:github_commit_id", h.Workspace.GetCommitFilesDetails)
 
 	g.POST("/workspace/accept-invite", h.Workspace.AcceptInvite)
 
@@ -60,4 +64,7 @@ func v1Routes(g *echo.Group, h AppModel) {
 	githubRepo := g.Group("/github-repository", middleware.JWTVerify())
 	githubRepo.GET("/repos/:repo_id/activity", h.GitHubRepository.GetRepositoryActivity)
 	githubRepo.GET("/repos/:repo_id/commits/:commit_sha", h.GitHubRepository.GetCommitDetails)
+	githubRepo.GET("/commit-files/:commit_file_id/related", h.GitHubRepository.GetRelatedCommitFiles)
+	githubRepo.POST("/commit-files/:commit_file_id/explain", h.GitHubRepository.ExplainCommitFileChange)
+
 }

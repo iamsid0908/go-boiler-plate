@@ -7,6 +7,7 @@ import (
 
 type GitHubInstallationsDomain interface {
 	GetAllByWorkspaceId(workspaceID int64) ([]models.GitHubRepository, error)
+	GetOrgDetailsByWorkspaceId(workspaceID int64) (models.OrgDetailsResponse, error)
 }
 
 type GitHubInstallationsDomainCtx struct{}
@@ -26,4 +27,51 @@ func (g *GitHubInstallationsDomainCtx) GetAllByWorkspaceId(workspaceID int64) ([
 	}
 
 	return repositories, nil
+}
+
+func (g *GitHubInstallationsDomainCtx) GetOrgDetailsByWorkspaceId(workspaceID int64) (models.OrgDetailsResponse, error) {
+	db := config.DbManager()
+	var installation models.GitHubInstallation
+
+	// Get GitHub installation details by workspace_id
+	err := db.Table("github_installations").
+		Where("workspace_id = ?", workspaceID).
+		First(&installation).Error
+
+	if err != nil {
+		return models.OrgDetailsResponse{}, err
+	}
+
+	// Get all repositories associated with this installation
+	var repositories []models.GitHubRepository
+	err = db.Table("git_hub_repository").
+		Where("installation_id = ?", installation.InstallationID).
+		Find(&repositories).Error
+
+	if err != nil {
+		return models.OrgDetailsResponse{}, err
+	}
+
+	// Map repositories to response format
+	var repoResponses []models.GitHubRepositoryResponse
+	for _, repo := range repositories {
+		repoResponses = append(repoResponses, models.GitHubRepositoryResponse{
+			ID:       repo.ID,
+			Name:     repo.Name,
+			FullName: repo.FullName,
+			Private:  repo.Private,
+		})
+	}
+
+	// Build response
+	orgDetails := models.OrgDetailsResponse{
+		ID:             installation.ID,
+		InstallationID: installation.InstallationID,
+		AccountLogin:   installation.AccountLogin,
+		AccountType:    installation.AccountType,
+		WorkspaceID:    installation.WorkspaceID,
+		Repositories:   repoResponses,
+	}
+
+	return orgDetails, nil
 }

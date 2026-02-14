@@ -54,3 +54,30 @@ type CommitDetailsResponse struct {
 	Commit CommitInfo         `json:"commit"`
 	Files  []CommitFileDetail `json:"files"`
 }
+
+type RelatedCommitFileResponse struct {
+	CommitFileID int64     `json:"commit_file_id"`
+	CommitSHA    string    `json:"commit_sha"`
+	Filename     string    `json:"filename"`
+	Author       string    `json:"author"`
+	CommittedAt  time.Time `json:"committed_at"`
+	Similarity   float64   `json:"similarity"`
+}
+
+type ExplainCommitFileChangeRequest struct {
+	CommitFileID string `json:"commit_file_id"`
+	Question     string `json:"question"`
+}
+
+type ExplainCommitFileChangeResponse struct {
+	Summary         string   `json:"summary"`
+	Reasoning       []string `json:"reasoning"`
+	ConfidenceScore float64  `json:"confidence_score"`
+}
+
+type GetRepoCommitsReqs struct {
+	RepoID int64 `json:"repo_id"`
+	UserID int64 `json:"user_id"`
+	Limit  int   `json:"limit"`
+	Page   int   `json:"page"`
+}

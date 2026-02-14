@@ -8,7 +8,7 @@ import (
 
 type CommitFileEmbedding struct {
 	ID               int64           `json:"id" db:"id"`
-	Embedding        pgvector.Vector `json:"embedding" db:"embedding"`
+	Embedding        pgvector.Vector `gorm:"type:vector(1536);not null"`
 	CommitFileID     int64           `json:"commit_file_id" db:"commit_file_id"`
 	GithubCommitID   int64           `json:"github_commit_id" db:"github_commit_id"`
 	GithubRepoID     int64           `json:"github_repo_id" db:"github_repo_id"`

@@ -137,3 +137,12 @@ type InstallationReposResponse struct {
 	TotalCount   int          `json:"total_count"`
 	Repositories []GitHubRepo `json:"repositories"`
 }
+
+type OrgDetailsResponse struct {
+	ID             int64                      `json:"id"`
+	InstallationID int64                      `json:"installation_id"`
+	AccountLogin   string                     `json:"account_login"`
+	AccountType    string                     `json:"account_type"`
+	WorkspaceID    int64                      `json:"workspace_id"`
+	Repositories   []GitHubRepositoryResponse `json:"repositories"`
+}

@@ -80,6 +80,8 @@ func App() AppModel {
 		UserDomain:                userDomain,
 		GitHubRepositoryDomain:    gitHubRepositoryDomain,
 		GitHubInstallationsDomain: gitHubInstallationsDomain,
+		GitHubCommitsDomain:       gitHubCommitsDomain,
+		GitHubCommitFilesDomain:   gitHubCommitFilesDomain,
 	}
 	channelService := service.ChannelService{
 		ChannelDomain:         channelDomain,
@@ -108,8 +110,10 @@ func App() AppModel {
 	}
 
 	gitHubRepositoryService := service.GitHubRepositoryService{
-		GitHubRepositoryDomain: gitHubRepositoryDomain,
-		GitHubCommitsDomain:    gitHubCommitsDomain,
+		GitHubRepositoryDomain:    gitHubRepositoryDomain,
+		GitHubCommitsDomain:       gitHubCommitsDomain,
+		GitHubCommitFilesDomain:   gitHubCommitFilesDomain,
+		CommitFileEmbeddingDomain: commitFileEmbeddingDomain,
 	}
 
 	//handler

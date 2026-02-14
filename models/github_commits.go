@@ -12,3 +12,17 @@ type GitHubCommits struct {
 	CommittedAt        time.Time `gorm:"column:committed_at;index;not null"`
 	CreatedAt          time.Time `gorm:"column:created_at;autoCreateTime"`
 }
+
+type GitHubCommitResponse struct {
+	Id               int64     `json:"id"`
+	Sha              string    `json:"sha"`
+	Message          string    `json:"message"`
+	GitHubAuthorName string    `json:"github_author_name"`
+	AuthorEmail      string    `json:"author_email"`
+	CommittedAt      time.Time `json:"committed_at"`
+}
+
+type GetRepoCommitsPaginatedResponse struct {
+	Commits []GitHubCommitResponse `json:"commits"`
+	Meta    MetaPagination         `json:"meta"`
+}

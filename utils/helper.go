@@ -26,7 +26,7 @@ func SendMail(templatePath string, data models.SendMail, subject string) {
 	var body bytes.Buffer
 	t, err := template.ParseFiles(templatePath)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error parsing email template:", err)
 		return
 	}
 	t.Execute(&body, data)
@@ -40,8 +40,12 @@ func SendMail(templatePath string, data models.SendMail, subject string) {
 	d := gomail.NewDialer("smtp.gmail.com", 587, config.GetConfig().PrimaryEmail, config.GetConfig().PrimaryEmailPassword)
 
 	if err := d.DialAndSend(m); err != nil {
-		panic(err)
+		fmt.Println("Error sending email:", err)
+		fmt.Println("Make sure you're using a Gmail App Password, not your regular password")
+		fmt.Println("Visit: https://support.google.com/accounts/answer/185833")
+		return
 	}
+	fmt.Println("Email sent successfully to:", data.SendTo)
 }
 
 func SendMailForInvite(templatePath string, data models.SendMail, subject string) {

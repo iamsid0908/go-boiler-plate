@@ -172,3 +172,88 @@ func (workspaceHandler *WorkspaceHandler) GetAllRepository(c echo.Context) error
 	}
 	return c.JSON(http.StatusOK, resp)
 }
+
+func (workspaceHandler *WorkspaceHandler) GetOrgDetails(c echo.Context) error {
+	userId := c.Get("id").(int64)
+	workspaceIDStr := c.QueryParam("workspace_id")
+	fmt.Println(userId, workspaceIDStr)
+	if userId == 0 || workspaceIDStr == "" {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid user id or workspace id"})
+	}
+	workspaceID, err := strconv.ParseInt(workspaceIDStr, 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid workspace id format"})
+	}
+	data, err := workspaceHandler.WorkspaceService.GetOrgDetails(userId, workspaceID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
+	}
+	resp := models.BasicResp{
+		Message: utils.Success,
+		Data:    data,
+	}
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (workspaceHandler *WorkspaceHandler) GetRepoCommits(c echo.Context) error {
+	userId := c.Get("id").(int64)
+	repoIDStr := c.Param("repo_id")
+	limit := c.QueryParam("limit")
+	if limit == "" {
+		limit = "10" // default limit
+	}
+	page := c.QueryParam("page")
+	if page == "" {
+		page = "1" // default page
+	}
+	if userId == 0 || repoIDStr == "" {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid user id or repository id"})
+	}
+	repoID, err := strconv.ParseInt(repoIDStr, 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid repository id format"})
+	}
+	limitInt, err := strconv.Atoi(limit)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid limit format"})
+	}
+	pageInt, err := strconv.Atoi(page)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid page format"})
+	}
+	param := models.GetRepoCommitsReqs{
+		UserID: userId,
+		RepoID: repoID,
+		Limit:  limitInt,
+		Page:   pageInt,
+	}
+	data, err := workspaceHandler.WorkspaceService.GetRepoCommits(param)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
+	}
+	resp := models.BasicResp{
+		Message: utils.Success,
+		Data:    data,
+	}
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (workspaceHandler *WorkspaceHandler) GetCommitFilesDetails(c echo.Context) error {
+	commitIDStr := c.Param("github_commit_id")
+	if commitIDStr == "" {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid commit id"})
+	}
+	commitID, err := strconv.ParseInt(commitIDStr, 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid commit id format"})
+	}
+	data, err := workspaceHandler.WorkspaceService.GetCommitFilesDetails(commitID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
+	}
+	resp := models.BasicResp{
+		Message: utils.Success,
+		Data:    data,
+	}
+	return c.JSON(http.StatusOK, resp)
+}

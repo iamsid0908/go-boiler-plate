@@ -22,6 +22,8 @@ type WorkspaceService struct {
 	UserDomain                domain.UserDomain
 	GitHubRepositoryDomain    domain.GitHubRepositoryDomain
 	GitHubInstallationsDomain domain.GitHubInstallationsDomain
+	GitHubCommitsDomain       domain.GitHubCommitsDomain
+	GitHubCommitFilesDomain   domain.GitHubCommitFilesDomain
 }
 
 func (c *WorkspaceService) CreateWorkspace(param models.CreateWorkspaceReqs) (models.CreateWorkspaceResp, error) {
@@ -268,4 +270,31 @@ func (c *WorkspaceService) GetAllRepository(userId, workspaceID int64) ([]models
 	}
 
 	return resp, nil
+}
+
+func (c *WorkspaceService) GetOrgDetails(userId, workspaceID int64) (models.OrgDetailsResponse, error) {
+	data, err := c.GitHubInstallationsDomain.GetOrgDetailsByWorkspaceId(workspaceID)
+	if err != nil {
+		return models.OrgDetailsResponse{}, err
+	}
+	return data, nil
+}
+
+func (c *WorkspaceService) GetRepoCommits(param models.GetRepoCommitsReqs) (models.GetRepoCommitsPaginatedResponse, error) {
+	commits, err := c.GitHubCommitsDomain.GetRepoCommitsByRepoId(param)
+	if err != nil {
+		return models.GetRepoCommitsPaginatedResponse{}, err
+	}
+	return commits, nil
+}
+
+func (c *WorkspaceService) GetCommitFilesDetails(commitId int64) (models.GitHubCommitFiles, error) {
+	commitParam := models.GitHubCommitFiles{
+		GithubCommitID: commitId,
+	}
+	data, err := c.GitHubCommitFilesDomain.GetCommitFilesDetailsByCommitId(commitParam)
+	if err != nil {
+		return models.GitHubCommitFiles{}, err
+	}
+	return data, nil
 }

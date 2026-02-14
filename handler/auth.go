@@ -112,29 +112,59 @@ func (authHandler *AuthHandler) LoginUser(c echo.Context) error {
 		HttpOnly: true,
 		Secure:   true,
 		Path:     "/",
-		MaxAge:   86400,
+		MaxAge:   86400, // 24 hours
 		SameSite: http.SameSiteNoneMode,
 	}
 	c.SetCookie(cookie)
+
+	// Don't send token in response body when using HTTP-only cookies
 	resp := models.BasicResp{
 		Message: utils.Success,
-		Data:    data,
+		Data: map[string]interface{}{
+			"email":   data.Email,
+			"name":    data.Name,
+			"role":    data.Role,
+			"user_id": data.ID,
+		},
 	}
 	return c.JSON(http.StatusOK, resp)
 }
 
 func (authHandler *AuthHandler) UserLogOut(c echo.Context) error {
 	cookie := &http.Cookie{
-		Name:     "accessToken",
+		Name:     "Bearer",
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
-		HttpOnly: true, // Keep it HttpOnly, but setting MaxAge -1 removes it
-		// Secure:   true, // Keep it secure if using HTTPS
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 	}
 
 	c.SetCookie(cookie)
-	return c.JSON(http.StatusOK, map[string]string{"message": "Logged out successfully"})
+	return c.JSON(http.StatusOK, models.BasicResp{
+		Message: utils.Success,
+		Data:    "Logged out successfully",
+	})
+}
+
+// ValidateSession - Check if user's session is valid
+func (authHandler *AuthHandler) ValidateSession(c echo.Context) error {
+	// If middleware passed, user is authenticated
+	// Extract user data set by middleware
+	userData := map[string]interface{}{
+		"id":       c.Get("id"),
+		"email":    c.Get("email"),
+		"name":     c.Get("name"),
+		"role":     c.Get("role"),
+		"language": c.Get("language"),
+	}
+
+	resp := models.BasicResp{
+		Message: utils.Success,
+		Data:    userData,
+	}
+	return c.JSON(http.StatusOK, resp)
 }
 
 func (authHandler *AuthHandler) GithubOAuthCallback(c echo.Context) error {

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"core/models"
 	"core/service"
 	"fmt"
 	"net/http"
@@ -51,4 +52,34 @@ func (githubRepositoryHandler *GitHubRepositoryHandler) GetCommitDetails(c echo.
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 	return c.JSON(http.StatusOK, commitDetails)
+}
+
+func (githubRepositoryHandler *GitHubRepositoryHandler) GetRelatedCommitFiles(c echo.Context) error {
+	commitFileID := c.Param("commit_file_id")
+	if commitFileID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid commit file id"})
+	}
+	relatedFiles, err := githubRepositoryHandler.GitHubRepositoryService.GetRelatedCommitFiles(commitFileID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, relatedFiles)
+}
+
+func (githubRepositoryHandler *GitHubRepositoryHandler) ExplainCommitFileChange(c echo.Context) error {
+	commitFileID := c.Param("commit_file_id")
+	if commitFileID == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid commit file id"})
+	}
+
+	param := models.ExplainCommitFileChangeRequest{}
+	if err := c.Bind(&param); err != nil {
+		return c.JSON(400, models.BasicResp{Message: err.Error()})
+	}
+	param.CommitFileID = commitFileID
+	explainedAnswer, err := githubRepositoryHandler.GitHubRepositoryService.ExplainCommitFileChange(param)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+	return c.JSON(http.StatusOK, explainedAnswer)
 }
