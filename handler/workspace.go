@@ -95,6 +95,10 @@ func (workspaceHandler *WorkspaceHandler) AcceptInvite(c echo.Context) error {
 	}
 	param.UserID = userID
 	param.Email = email
+
+	if param.WorkspaceID == 0 {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid workspace id"})
+	}
 	fmt.Println("param--", param)
 	data, err := workspaceHandler.WorkspaceService.AcceptInvite(param)
 	if err != nil {
@@ -136,7 +140,6 @@ func ExtractInviteToken(c echo.Context) (int64, string, error) {
 
 func (workspaceHandler *WorkspaceHandler) GetAllWorkspace(c echo.Context) error {
 	userId := c.Get("id").(int64)
-	fmt.Println(userId)
 	if userId == 0 {
 		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid user id"})
 	}
@@ -248,6 +251,40 @@ func (workspaceHandler *WorkspaceHandler) GetCommitFilesDetails(c echo.Context) 
 		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid commit id format"})
 	}
 	data, err := workspaceHandler.WorkspaceService.GetCommitFilesDetails(commitID)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
+	}
+	resp := models.BasicResp{
+		Message: utils.Success,
+		Data:    data,
+	}
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (workspaceHandler *WorkspaceHandler) GetWorkspaceDetails(c echo.Context) error {
+	param := models.GetWorkspaceDetailsReqs{}
+	if err := c.Bind(&param); err != nil {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: err.Error()})
+	}
+
+	data, err := workspaceHandler.WorkspaceService.GetWorkspaceDetails(param)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
+	}
+	resp := models.BasicResp{
+		Message: utils.Success,
+		Data:    data,
+	}
+	return c.JSON(http.StatusOK, resp)
+}
+
+func (workspaceHandler *WorkspaceHandler) GetWorkSpaceMembers(c echo.Context) error {
+	param := models.GetWorkspaceDetailsReqs{}
+	if err := c.Bind(&param); err != nil {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: err.Error()})
+	}
+
+	data, err := workspaceHandler.WorkspaceService.GetWorkSpaceMembers(param)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
 	}

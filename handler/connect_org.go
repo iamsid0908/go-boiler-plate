@@ -7,6 +7,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"io"
+	"log"
 	"strconv"
 	"time"
 
@@ -119,17 +121,26 @@ func DecodeJwt(tokenString string) (jwt.MapClaims, error) {
 }
 
 func (h *ConnectOrgHandler) HandleWebhook(c echo.Context) error {
-	event := c.Request().Header.Get("X-GitHub-Event")
+	log.Println("🔥 WEBHOOK HIT")
 
-	if event == "ping" {
-		return c.JSON(200, map[string]string{"message": "pong"})
+	event := c.Request().Header.Get("X-GitHub-Event")
+	log.Println("EVENT =", event)
+
+	// ✅ Read body ONCE
+	bodyBytes, err := io.ReadAll(c.Request().Body)
+	if err != nil {
+		return c.JSON(400, map[string]string{"error": "cannot read body"})
 	}
 
-	if event == "installation" {
-		var payload models.GitHubInstallationEvent
+	switch event {
 
-		if err := json.NewDecoder(c.Request().Body).Decode(&payload); err != nil {
-			return c.JSON(400, map[string]string{"error": "invalid payload"})
+	case "ping":
+		return c.JSON(200, map[string]string{"message": "pong"})
+
+	case "installation":
+		var payload models.GitHubInstallationEvent
+		if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+			return c.JSON(400, map[string]string{"error": "invalid installation payload"})
 		}
 
 		if payload.Action != "created" {
@@ -144,7 +155,6 @@ func (h *ConnectOrgHandler) HandleWebhook(c echo.Context) error {
 			return c.JSON(500, map[string]string{"error": err.Error()})
 		}
 
-		// 🔑 Case 1: installation does NOT exist → INSERT (unclaimed)
 		if existing == nil {
 			params := models.GitHubInstallation{
 				InstallationID: payload.Installation.ID,
@@ -155,28 +165,41 @@ func (h *ConnectOrgHandler) HandleWebhook(c echo.Context) error {
 				WorkspaceID:    0,
 			}
 
-			_, err := h.ConnectOrgService.ConnectOrgDomain.StoreInstallation(params)
-			if err != nil {
+			if _, err := h.ConnectOrgService.ConnectOrgDomain.StoreInstallation(params); err != nil {
 				return c.JSON(500, map[string]string{"error": err.Error()})
 			}
 
 			return c.JSON(200, map[string]string{"status": "created"})
 		}
 
-		// // 🔑 Case 2: installation already exists → UPDATE metadata only
-		// err = h.ConnectOrgService.ConnectOrgDomain.UpdateInstallationMetadata(
-		// 	payload.Installation.ID,
-		// 	payload.Installation.Account.Login,
-		// 	payload.Installation.Account.Type,
-		// )
-		// if err != nil {
-		// 	return c.JSON(500, map[string]string{"error": err.Error()})
-		// }
+		return c.JSON(200, map[string]string{"status": "already_exists"})
 
-		return c.JSON(200, map[string]string{"status": "updated"})
+	case "push":
+		var payload models.GitHubPushEvent
+		if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+			return c.JSON(400, map[string]string{"error": "invalid push payload"})
+		}
+
+		log.Println("✅ PUSH EVENT RECEIVED")
+		log.Println("📦 Installation ID:", payload.Installation.ID)
+		log.Println("📦 Repo ID:", payload.Repository.ID)
+		log.Println("📦 Commits:", len(payload.Commits))
+
+		// Process push event in background
+		go func(p models.GitHubPushEvent) {
+			log.Printf("🚀 Processing push event for repo %s (installation %d)\n", p.Repository.FullName, p.Installation.ID)
+			if err := h.ConnectOrgService.HandlePushEvent(p); err != nil {
+				log.Printf("❌ Error processing push event: %v\n", err)
+			} else {
+				log.Printf("✅ Successfully processed push event for repo %s\n", p.Repository.FullName)
+			}
+		}(payload)
+
+		return c.JSON(200, map[string]string{"status": "push_received"})
+
+	default:
+		return c.JSON(200, map[string]string{"status": "ignored"})
 	}
-
-	return c.JSON(200, map[string]string{"status": "ignored"})
 }
 
 func (h *ConnectOrgHandler) GenerateInstallationToken(c echo.Context) error {

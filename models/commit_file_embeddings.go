@@ -17,3 +17,15 @@ type CommitFileEmbedding struct {
 	PlatformUserID   *int64          `json:"platform_user_id,omitempty" db:"platform_user_id"`
 	CreatedAt        time.Time       `json:"created_at" db:"created_at"`
 }
+
+type EmbedCommitFile2 struct {
+	CommitFileId   int64  `json:"commit_file_id"`
+	GitHubRepoId   int64  `json:"github_repo_id"`
+	InstallationID int64  `json:"installation_id"`
+	GithubCommitID int64  `json:"github_commit_id"`
+	FullName       string `json:"full_name"`
+	Filename       string `json:"filename"`
+	Author         string `json:"author"`
+	Message        string `json:"message"`
+	Patch          string `json:"patch"`
+}

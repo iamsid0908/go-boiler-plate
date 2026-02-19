@@ -22,6 +22,7 @@ type ConnectOrgDomain interface {
 	FindInstallationByID(Id int64) (*models.GitHubInstallation, error)
 	GenerateInstallationToken(appJwt string, url string) (string, error)
 	FetchAllRepositoriesWithCommits(installationToken string) (models.AllReposWithCommitsResponse, error)
+	FetchCommitDetail(token string, fullRepoName string, sha string) (*models.GitHubCommitDetail, error)
 }
 
 type ConnectOrgDomainCtx struct {
@@ -240,7 +241,6 @@ func (c *ConnectOrgDomainCtx) FetchAllRepositoriesWithCommits(installationToken 
 		TotalRepositories: repoResult.TotalCount,
 		Repositories:      make([]models.RepositoryCommitsResponse, 0),
 	}
-	fmt.Println(allReposWithCommits)
 	// return allReposWithCommits, nil
 	for _, repo := range repoResult.Repositories {
 		fmt.Printf("Processing repo: %s\n", repo.FullName)

@@ -9,6 +9,7 @@ type GitHubCommitsDomain interface {
 	StoreCommit(params models.GitHubCommits) (int64, error)
 	GetCommitDetails(repoID int64, commitSHA string) (models.CommitDetailsResponse, error)
 	GetRepoCommitsByRepoId(param models.GetRepoCommitsReqs) (models.GetRepoCommitsPaginatedResponse, error)
+	StoreCommitsBulk(params []models.GitHubCommits) ([]models.GitHubCommits, error)
 }
 
 type GitHubCommitsDomainCtx struct{}
@@ -106,4 +107,17 @@ func (g *GitHubCommitsDomainCtx) GetRepoCommitsByRepoId(param models.GetRepoComm
 	}
 
 	return response, nil
+}
+
+func (g *GitHubCommitsDomainCtx) StoreCommitsBulk(params []models.GitHubCommits) ([]models.GitHubCommits, error) {
+	db := config.DbManager()
+
+	err := db.Create(&params).Error
+
+	if err != nil {
+		return nil, err
+	}
+
+	return params, nil
+
 }

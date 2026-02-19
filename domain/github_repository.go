@@ -9,6 +9,8 @@ type GitHubRepositoryDomain interface {
 	StoreRepository(params models.GitHubRepository) (int64, error)
 	GetAllByWorkspaceId(workspaceID int64) ([]models.GitHubRepository, error)
 	GetRepositoryActivity(repoID, days int64) ([]models.CommitActivity, error)
+	FindRepositoryByInstallationID(params models.GitHubRepository) (models.GitHubRepository, error)
+	FindUserIdByInstallationID(params models.GitHubRepository) (int64, error)
 }
 
 type GitHubRepositoryDomainCtx struct{}
@@ -74,4 +76,28 @@ func (g *GitHubRepositoryDomainCtx) GetRepositoryActivity(
 	}
 
 	return activities, nil
+}
+
+func (g *GitHubRepositoryDomainCtx) FindRepositoryByInstallationID(params models.GitHubRepository) (models.GitHubRepository, error) {
+	db := config.DbManager()
+	var repository models.GitHubRepository
+
+	err := db.Where("installation_id = ? and github_repo_id = ?", params.InstallationID, params.GithubRepoID).First(&repository).Error
+	if err != nil {
+		return models.GitHubRepository{}, err
+	}
+
+	return repository, nil
+}
+
+func (g *GitHubRepositoryDomainCtx) FindUserIdByInstallationID(params models.GitHubRepository) (int64, error) {
+	db := config.DbManager()
+	var repository models.GitHubRepository
+
+	err := db.Where("installation_id = ? ", params.InstallationID).First(&repository).Error
+	if err != nil {
+		return 0, err
+	}
+
+	return repository.UserID, nil
 }

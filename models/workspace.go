@@ -68,6 +68,26 @@ type GetAllWorkspaceByUserIdResp struct {
 	Name      string    `json:"name"`
 	OwnerID   int64     `json:"owner_id"`
 	Type      bool      `json:"type"`
+	Role      string    `json:"role"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type GetWorkspaceDetailsReqs struct {
+	Workspace_id int64 `json:"workspace_id"`
+}
+
+type GetWorkspaceDetailsResp struct {
+	WorkspaceID int64  `json:"workspace_id"`
+	Workspace   string `json:"workspace"` // name/title of workspace
+	UserID      int64  `json:"user_id"`
+	OwnerEmail  string `json:"owner_email"`
+	OwnerName   string `json:"owner_name"`
+}
+
+type WorkspaceMembersResp struct {
+	UserID int64  `json:"user_id"`
+	Name   string `json:"name"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
 }

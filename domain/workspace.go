@@ -8,7 +8,8 @@ import (
 type WorkspaceDomain interface {
 	Create(params models.Workspace) (models.Workspace, error)
 	GetById(params models.Workspace) (models.Workspace, error)
-	GetAllWorkspaceByUserId(userId int64) []models.Workspace
+	GetAllWorkspaceByUserId(userId int64) []models.GetAllWorkspaceByUserIdResp
+	GetWorkspaceAndUserById(params models.Workspace) (models.GetWorkspaceDetailsResp, error)
 }
 
 type WorkspaceDomainCtx struct {
@@ -33,14 +34,33 @@ func (c *WorkspaceDomainCtx) GetById(params models.Workspace) (models.Workspace,
 	return workspace, nil
 }
 
-func (c *WorkspaceDomainCtx) GetAllWorkspaceByUserId(userId int64) []models.Workspace {
+func (c *WorkspaceDomainCtx) GetAllWorkspaceByUserId(userId int64) []models.GetAllWorkspaceByUserIdResp {
 	db := config.DbManager()
-	var workspaces []models.Workspace
-	err := db.Joins("JOIN manage_workspace ON manage_workspace.workspace_id = workspace.id").
+	var workspaces []models.GetAllWorkspaceByUserIdResp
+	err := db.Table("workspace").
+		Select("workspace.id, workspace.name, workspace.owner_id, workspace.type, manage_workspace.role, workspace.created_at, workspace.updated_at").
+		Joins("JOIN manage_workspace ON manage_workspace.workspace_id = workspace.id").
 		Where("manage_workspace.joined_user_id = ? AND manage_workspace.is_accepted = ?", userId, true).
-		Find(&workspaces).Error
+		Scan(&workspaces).Error
 	if err != nil {
 		return nil
 	}
 	return workspaces
+}
+
+func (c *WorkspaceDomainCtx) GetWorkspaceAndUserById(params models.Workspace) (models.GetWorkspaceDetailsResp, error) {
+	db := config.DbManager()
+	var result models.GetWorkspaceDetailsResp
+
+	err := db.Table("workspace").
+		Select("workspace.id as workspace_id, workspace.name as workspace, workspace.owner_id as user_id, users.email as owner_email, users.name as owner_name").
+		Joins("JOIN users ON workspace.owner_id = users.id").
+		Where("workspace.id = ?", params.ID).
+		Scan(&result).Error
+
+	if err != nil {
+		return models.GetWorkspaceDetailsResp{}, err
+	}
+
+	return result, nil
 }

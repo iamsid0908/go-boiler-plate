@@ -243,15 +243,11 @@ func (c *WorkspaceService) AcceptInvite(param models.AcceptInviteReqs) (models.B
 }
 
 func (c *WorkspaceService) GetAllWorkspace(userId int64) ([]models.GetAllWorkspaceByUserIdResp, error) {
-	data := c.WorkspaceDomain.GetAllWorkspaceByUserId(userId)
+	data := c.ManageWorkspaceDomain.GetAllWorkspaceByUserId(userId)
 	if data == nil {
 		return nil, fmt.Errorf("no workspaces found for user: %d", userId)
 	}
-	response := make([]models.GetAllWorkspaceByUserIdResp, len(data))
-	for i, workspace := range data {
-		response[i] = models.GetAllWorkspaceByUserIdResp(workspace)
-	}
-	return response, nil
+	return data, nil
 }
 
 func (c *WorkspaceService) GetAllRepository(userId, workspaceID int64) ([]models.GitHubRepositoryResponse, error) {
@@ -297,4 +293,35 @@ func (c *WorkspaceService) GetCommitFilesDetails(commitId int64) (models.GitHubC
 		return models.GitHubCommitFiles{}, err
 	}
 	return data, nil
+}
+
+func (c *WorkspaceService) GetWorkspaceDetails(param models.GetWorkspaceDetailsReqs) (models.GetWorkspaceDetailsResp, error) {
+	workSpacecParam := models.Workspace{
+		ID: param.Workspace_id,
+	}
+	data, err := c.WorkspaceDomain.GetWorkspaceAndUserById(workSpacecParam)
+	if err != nil {
+		return models.GetWorkspaceDetailsResp{}, err
+	}
+	return data, nil
+}
+
+func (c *WorkspaceService) GetWorkSpaceMembers(param models.GetWorkspaceDetailsReqs) ([]models.WorkspaceMembersResp, error) {
+	workSpacecParam := models.Workspace{
+		ID: param.Workspace_id,
+	}
+	members, err := c.ManageWorkspaceDomain.GetMembersByWorkspaceId(workSpacecParam)
+	if err != nil {
+		return nil, err
+	}
+	var resp []models.WorkspaceMembersResp
+	for _, member := range members {
+		resp = append(resp, models.WorkspaceMembersResp{
+			UserID: member.UserID,
+			Role:   member.Role,
+			Email:  member.Email,
+			Name:   member.Name,
+		})
+	}
+	return resp, nil
 }

@@ -81,3 +81,26 @@ type GetRepoCommitsReqs struct {
 	Limit  int   `json:"limit"`
 	Page   int   `json:"page"`
 }
+
+type GitHubPushEvent struct {
+	Installation struct {
+		ID int64 `json:"id"`
+	} `json:"installation"`
+
+	Repository struct {
+		ID       int64  `json:"id"`
+		Name     string `json:"name"`
+		FullName string `json:"full_name"`
+		Private  bool   `json:"private"`
+	} `json:"repository"`
+
+	Commits []struct {
+		ID        string `json:"id"`
+		Message   string `json:"message"`
+		Timestamp string `json:"timestamp"`
+		Author    struct {
+			Name  string `json:"name"`
+			Email string `json:"email"`
+		} `json:"author"`
+	} `json:"commits"`
+}

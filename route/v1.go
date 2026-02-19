@@ -46,8 +46,10 @@ func v1Routes(g *echo.Group, h AppModel) {
 	workspace.GET("/get_org_details", h.Workspace.GetOrgDetails)
 	workspace.GET("/get_repo_commits/:repo_id", h.Workspace.GetRepoCommits)
 	workspace.GET("/get_commit_details/:github_commit_id", h.Workspace.GetCommitFilesDetails)
+	workspace.POST("/get_members", h.Workspace.GetWorkSpaceMembers)
 
 	g.POST("/workspace/accept-invite", h.Workspace.AcceptInvite)
+	g.POST("/workspace/details", h.Workspace.GetWorkspaceDetails)
 
 	channel := g.Group("/channel", middleware.JWTVerify())
 	channel.POST("/create", h.Channel.CreateChannel)

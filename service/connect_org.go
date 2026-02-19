@@ -69,7 +69,6 @@ func (c *ConnectOrgService) FetchAndStoreRepositoryData(installationID int64, us
 		fmt.Printf("Error in generating token: %v\n", err)
 		return
 	}
-	fmt.Println("token:", token)
 
 	// Fetch all repos with commits
 	reposData, err := c.ConnectOrgDomain.FetchAllRepositoriesWithCommits(token)
@@ -77,7 +76,6 @@ func (c *ConnectOrgService) FetchAndStoreRepositoryData(installationID int64, us
 		fmt.Printf("Error fetching repositories: %v", err)
 		return
 	}
-	fmt.Printf("Fetched Repositories Data: %+v\n", reposData)
 
 	// Here, you would typically store the fetched data into your database.
 	// For demonstration, we are just printing the data.
@@ -365,12 +363,47 @@ func (c *ConnectOrgService) EmbedCommitFile(
 		GithubAuthorName: &commit.GithubAuthorName,
 		PlatformUserID:   nil, // filled later if GitHub OAuth linked
 	}
-	fmt.Println(embeddingRow)
 	if err := c.CommitFileEmbeddingDomain.StoreEmbedding(embeddingRow); err != nil {
 		return fmt.Errorf("failed to store embedding: %w", err)
 	}
 
 	fmt.Printf("✓ Embedded file: %s (commit: %s)\n", file.Filename, commit.CommitSHA[:7])
+	return nil
+}
+
+func (c *ConnectOrgService) EmbedCommitFile2(param models.EmbedCommitFile2) error {
+	ctx := context.Background()
+	text := fmt.Sprintf(
+		"Repository: %s\nFile: %s\nAuthor: %s\nCommit message: %s\n\nDiff:\n%s",
+		param.FullName,
+		param.Filename,
+		param.Author,
+		param.Message,
+		param.Patch,
+	)
+
+	// Generate embedding
+	embedding, err := GenerateEmbeddingRaw(ctx, text)
+	if err != nil {
+		return fmt.Errorf("failed to generate embedding: %w", err)
+	}
+	fmt.Println("Generated embedding of length:", len(embedding))
+
+	// Store in pgvector table
+	embeddingRow := models.CommitFileEmbedding{
+		Embedding:        pgvector.NewVector(embedding),
+		CommitFileID:     param.CommitFileId,
+		GithubCommitID:   param.GithubCommitID,
+		GithubRepoID:     param.GitHubRepoId,
+		InstallationID:   param.InstallationID,
+		GithubAuthorName: &param.Author,
+		PlatformUserID:   nil, // filled later if GitHub OAuth linked
+	}
+	if err := c.CommitFileEmbeddingDomain.StoreEmbedding(embeddingRow); err != nil {
+		return fmt.Errorf("failed to store embedding: %w", err)
+	}
+
+	fmt.Printf("✓ Embedded file: %s (repo: %s)\n", param.Filename, param.FullName)
 	return nil
 }
 
@@ -447,4 +480,133 @@ func GenerateGitHubAppJWT() (string, error) {
 
 	token := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
 	return token.SignedString(privateKey)
+}
+
+func (c *ConnectOrgService) HandlePushEvent(params models.GitHubPushEvent) error {
+	repoParam := models.GitHubRepository{
+		InstallationID: params.Installation.ID,
+		GithubRepoID:   params.Repository.ID,
+	}
+
+	// Try to find existing repository
+
+	userId, err := c.GitHubRepositoryDomain.FindUserIdByInstallationID(repoParam)
+	if err != nil {
+		fmt.Printf("Error finding user ID for installation %d: %v\n", params.Installation.ID, err)
+		// Proceed with userId as 0, will update later when installation is claimed
+		userId = 0
+	}
+
+	data, err := c.GitHubRepositoryDomain.FindRepositoryByInstallationID(repoParam)
+	if err != nil {
+		// Repository not found, create it
+		fmt.Printf("Repository not found for installation %d, creating new entry\n", params.Installation.ID)
+
+		newRepoParams := models.GitHubRepository{
+			InstallationID: params.Installation.ID,
+			GithubRepoID:   params.Repository.ID,
+			Name:           params.Repository.Name,
+			FullName:       params.Repository.FullName,
+			Private:        params.Repository.Private,
+			UserID:         userId, // Will be updated when installation is claimed
+		}
+
+		repoID, err := c.GitHubRepositoryDomain.StoreRepository(newRepoParams)
+		if err != nil {
+			return fmt.Errorf("error creating repository for installation %d: %w", params.Installation.ID, err)
+		}
+
+		// Update the data pointer with the newly created repository
+		newRepoParams.ID = repoID
+		data = newRepoParams
+
+		fmt.Printf("✓ Created repository: %s (ID: %d)\n", params.Repository.FullName, repoID)
+	}
+
+	// Prepare commit parameters array for bulk insert
+	commitParams := make([]models.GitHubCommits, 0, len(params.Commits))
+
+	for _, commit := range params.Commits {
+		committedAt, err := time.Parse(time.RFC3339, commit.Timestamp)
+		if err != nil {
+			fmt.Printf("Error parsing date for commit %s: %v\n", commit.ID, err)
+			// Use current time as fallback
+			committedAt = time.Now()
+		}
+
+		commitParam := models.GitHubCommits{
+			GithubRepositoryID: data.ID,
+			CommitSHA:          commit.ID,
+			CommitMessage:      commit.Message,
+			GithubAuthorName:   commit.Author.Name,
+			AuthorEmail:        commit.Author.Email,
+			CommittedAt:        committedAt,
+		}
+
+		commitParams = append(commitParams, commitParam)
+	}
+	commitData, err := c.GitHubCommitsDomain.StoreCommitsBulk(commitParams)
+	if err != nil {
+		return fmt.Errorf("error storing commits for repository %d: %w", data.ID, err)
+	}
+
+	token, err := c.GenerateInstallationToken(models.GenerateInstallationTokenReq{
+		ID:     params.Installation.ID,
+		UserID: data.UserID,
+	})
+	if err != nil {
+		return fmt.Errorf("error generating installation token: %w", err)
+	}
+
+	// ctx := context.Background()
+
+	for _, commits := range commitData {
+		commitFilesData, err := c.ConnectOrgDomain.FetchCommitDetail(token, params.Repository.FullName, commits.CommitSHA)
+		if err != nil {
+			fmt.Printf("Error fetching commit details for %s: %v\n", commits.CommitSHA, err)
+			continue
+		}
+
+		// Store files for this commit
+		for _, file := range commitFilesData.Files {
+			fileParams := models.GitHubCommitFiles{
+				GithubCommitID: commits.ID,
+				Filename:       file.Filename,
+				Status:         file.Status,
+				Additions:      file.Additions,
+				Deletions:      file.Deletions,
+				Patch:          file.Patch,
+			}
+
+			fileId, err := c.GitHubCommitFilesDomain.StoreCommitFile(fileParams)
+			if err != nil {
+				fmt.Printf("Error storing file %s: %v\n", file.Filename, err)
+				continue
+			}
+			// Update fileParams with the ID from database
+			fileParams.ID = fileId
+
+			// Generate and store embedding for this file
+			if shouldEmbed(fileParams) {
+				embedParam := models.EmbedCommitFile2{
+					CommitFileId:   fileId,
+					GitHubRepoId:   data.GithubRepoID,
+					InstallationID: data.InstallationID,
+					GithubCommitID: commits.ID,
+					FullName:       params.Repository.FullName,
+					Filename:       file.Filename,
+					Author:         commits.GithubAuthorName,
+					Message:        commits.CommitMessage,
+					Patch:          file.Patch,
+				}
+				go func(param models.EmbedCommitFile2) {
+					if err := c.EmbedCommitFile2(param); err != nil {
+						fmt.Printf("Error embedding file %s: %v\n", param.Filename, err)
+					}
+				}(embedParam)
+			}
+		}
+	}
+
+	return nil
 }
