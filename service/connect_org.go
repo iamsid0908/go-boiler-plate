@@ -6,6 +6,7 @@ import (
 	"core/config"
 	"core/domain"
 	"core/models"
+	"core/queue"
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
@@ -28,6 +29,7 @@ type ConnectOrgService struct {
 	GitHubRepositoryDomain    domain.GitHubRepositoryDomain
 	GitHubCommitFilesDomain   domain.GitHubCommitFilesDomain
 	CommitFileEmbeddingDomain domain.CommitFileEmbeddingDomain
+	QueueClient               *queue.Client
 }
 
 func (c *ConnectOrgService) UpdateInstallationByUser(param models.GitHubInstallationByUserReq) (string, error) {
@@ -54,8 +56,14 @@ func (c *ConnectOrgService) UpdateInstallationByUser(param models.GitHubInstalla
 		return "", err
 	}
 
-	// Start background task to fetch and store repository data
-	go c.FetchAndStoreRepositoryData(params.InstallationID, params.UserID, params.WorkspaceID)
+	// Enqueue background task to fetch and store repository data
+	if err := c.QueueClient.EnqueueFetchAndStoreRepos(queue.FetchAndStoreReposPayload{
+		InstallationID: params.InstallationID,
+		UserID:         params.UserID,
+		WorkspaceID:    params.WorkspaceID,
+	}); err != nil {
+		fmt.Printf("Error enqueuing FetchAndStoreRepos task: %v\n", err)
+	}
 
 	return result, nil
 }
@@ -89,7 +97,7 @@ func (c *ConnectOrgService) FetchAndStoreRepositoryData(installationID int64, us
 }
 
 func (c *ConnectOrgService) StoreRepositoriesAndCommits(installationID, userID int64, data models.AllReposWithCommitsResponse) error {
-	ctx := context.Background()
+	// ctx := context.Background()
 	for _, repo := range data.Repositories {
 		// Store repository
 		repoParams := models.GitHubRepository{
@@ -153,19 +161,22 @@ func (c *ConnectOrgService) StoreRepositoriesAndCommits(installationID, userID i
 				// Update fileParams with the ID from database
 				fileParams.ID = fileId
 
-				// Generate and store embedding for this file
+				// Enqueue embedding task for this file
 				if shouldEmbed(fileParams) {
-					// Use the data we already have instead of fetching from DB
-					go func(
-						repo models.GitHubRepository,
-						commit models.GitHubCommits,
-						file models.GitHubCommitFiles,
-					) {
-						if err := c.EmbedCommitFile(ctx, repo, commit, file); err != nil {
-							fmt.Printf("Error embedding file %s: %v\n", file.Filename, err)
-						}
-					}(repoParams, commitParams, fileParams)
-
+					if err := c.QueueClient.EnqueueEmbedCommitFile(queue.EmbedCommitFilePayload{
+						RepoFullName:  repoParams.FullName,
+						RepoGithubID:  repoParams.GithubRepoID,
+						RepoInstallID: repoParams.InstallationID,
+						CommitID:      commitParams.ID,
+						CommitSHA:     commitParams.CommitSHA,
+						CommitMessage: commitParams.CommitMessage,
+						AuthorName:    commitParams.GithubAuthorName,
+						FileID:        fileParams.ID,
+						Filename:      fileParams.Filename,
+						Patch:         fileParams.Patch,
+					}); err != nil {
+						fmt.Printf("Error enqueuing embed for file %s: %v\n", fileParams.Filename, err)
+					}
 				}
 			}
 		}
@@ -586,11 +597,11 @@ func (c *ConnectOrgService) HandlePushEvent(params models.GitHubPushEvent) error
 			// Update fileParams with the ID from database
 			fileParams.ID = fileId
 
-			// Generate and store embedding for this file
+			// Enqueue embedding task for this file
 			if shouldEmbed(fileParams) {
-				embedParam := models.EmbedCommitFile2{
-					CommitFileId:   fileId,
-					GitHubRepoId:   data.GithubRepoID,
+				if err := c.QueueClient.EnqueueEmbedCommitFileV2(queue.EmbedCommitFileV2Payload{
+					CommitFileID:   fileId,
+					GitHubRepoID:   data.GithubRepoID,
 					InstallationID: data.InstallationID,
 					GithubCommitID: commits.ID,
 					FullName:       params.Repository.FullName,
@@ -598,12 +609,9 @@ func (c *ConnectOrgService) HandlePushEvent(params models.GitHubPushEvent) error
 					Author:         commits.GithubAuthorName,
 					Message:        commits.CommitMessage,
 					Patch:          file.Patch,
+				}); err != nil {
+					fmt.Printf("Error enqueuing embed for file %s: %v\n", file.Filename, err)
 				}
-				go func(param models.EmbedCommitFile2) {
-					if err := c.EmbedCommitFile2(param); err != nil {
-						fmt.Printf("Error embedding file %s: %v\n", param.Filename, err)
-					}
-				}(embedParam)
 			}
 		}
 	}

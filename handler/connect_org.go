@@ -185,15 +185,11 @@ func (h *ConnectOrgHandler) HandleWebhook(c echo.Context) error {
 		log.Println("📦 Repo ID:", payload.Repository.ID)
 		log.Println("📦 Commits:", len(payload.Commits))
 
-		// Process push event in background
-		go func(p models.GitHubPushEvent) {
-			log.Printf("🚀 Processing push event for repo %s (installation %d)\n", p.Repository.FullName, p.Installation.ID)
-			if err := h.ConnectOrgService.HandlePushEvent(p); err != nil {
-				log.Printf("❌ Error processing push event: %v\n", err)
-			} else {
-				log.Printf("✅ Successfully processed push event for repo %s\n", p.Repository.FullName)
-			}
-		}(payload)
+		// Enqueue push event for background processing via asynq
+		if err := h.ConnectOrgService.QueueClient.EnqueueHandlePushEvent(bodyBytes); err != nil {
+			log.Printf("❌ Error enqueuing push event: %v\n", err)
+			return c.JSON(500, map[string]string{"error": "failed to enqueue push event"})
+		}
 
 		return c.JSON(200, map[string]string{"status": "push_received"})
 

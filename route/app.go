@@ -1,9 +1,14 @@
 package route
 
 import (
+	"core/config"
 	"core/domain"
 	"core/handler"
+	"core/queue"
 	"core/service"
+	"log"
+
+	"github.com/hibiken/asynq"
 )
 
 type AppModel struct {
@@ -25,6 +30,14 @@ type AppModel struct {
 }
 
 func App() AppModel {
+	// Initialize queue client
+	redisAddr := config.GetConfig().RedisAddr
+	if redisAddr == "" {
+		redisAddr = "localhost:6379" // default
+	}
+	queueClient := queue.NewClient(redisAddr)
+	log.Printf("[queue] Client connected to Redis at %s", redisAddr)
+
 	//domain
 	healthDomain := &domain.HealthDomainCtx{}
 	authDomain := &domain.AuthDomainCtx{}
@@ -107,7 +120,13 @@ func App() AppModel {
 		GitHubRepositoryDomain:    gitHubRepositoryDomain,
 		GitHubCommitFilesDomain:   gitHubCommitFilesDomain,
 		CommitFileEmbeddingDomain: commitFileEmbeddingDomain,
+		QueueClient:               queueClient,
 	}
+
+	// Start the asynq worker server (processes enqueued tasks in background)
+	mux := asynq.NewServeMux()
+	RegisterTaskHandlers(mux, &connectOrgService)
+	queue.StartWorker(redisAddr, mux)
 
 	gitHubRepositoryService := service.GitHubRepositoryService{
 		GitHubRepositoryDomain:    gitHubRepositoryDomain,

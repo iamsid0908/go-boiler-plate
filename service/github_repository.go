@@ -74,7 +74,7 @@ func (g *GitHubRepositoryService) ExplainCommitFileChange(param models.ExplainCo
 
 	// Build prompts
 	systemPrompt := g.buildSystemPrompt()
-	userPrompt := g.buildUserPrompt(mainCommitFile, relatedFilesContext, len(data))
+	userPrompt := g.buildUserPrompt(mainCommitFile, relatedFilesContext, len(data), param.Question)
 
 	// Log token estimation (rough: 1 token ≈ 4 chars)
 	estimatedTokens := (len(systemPrompt) + len(userPrompt)) / 4
@@ -193,7 +193,7 @@ func (g *GitHubRepositoryService) buildSystemPrompt() string {
 Be concise and technical.`
 }
 
-func (g *GitHubRepositoryService) buildUserPrompt(mainCommitFile models.GitHubCommitFiles, relatedFilesContext string, relatedCount int) string {
+func (g *GitHubRepositoryService) buildUserPrompt(mainCommitFile models.GitHubCommitFiles, relatedFilesContext string, relatedCount int, question string) string {
 	const maxMainPatchChars = 1000
 
 	// Truncate main file patch if too long
@@ -213,8 +213,10 @@ Patch:
 RELATED CHANGES (%d similar commits):
 %s
 
-Provide a brief explanation of what changed, why, and any patterns from historical changes.`,
-		mainCommitFile.Filename, mainCommitFile.Status,
+Provide a brief explanation of what changed, why, and any patterns from historical changes.
+
+QUESTION:
+%s`, mainCommitFile.Filename, mainCommitFile.Status,
 		mainCommitFile.Additions, mainCommitFile.Deletions, mainPatch,
-		relatedCount, relatedFilesContext)
+		relatedCount, relatedFilesContext, question)
 }

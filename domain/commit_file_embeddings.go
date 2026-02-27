@@ -39,16 +39,22 @@ func (g *CommitFileEmbeddingDomainCtx) GetRelatedCommitFiles(commitFileID string
 		InstallationID int64
 	}
 
-	err := db.
+	tx := db.
 		Table("commit_file_embedding").
 		Select("embedding, github_repo_id, installation_id").
 		Where("commit_file_id = ?", commitFileID).
-		Scan(&source).Error
+		Scan(&source)
 
+	err := tx.Error
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch source embedding: %w", err)
 	}
-	fmt.Println("Source Embedding:", source.Embedding)
+
+	// No embedding row (or empty embedding) means no related files can be computed.
+	// Return empty result so caller can continue with only the main commit file.
+	if tx.RowsAffected == 0 || len(source.Embedding.Slice()) == 0 {
+		return []models.RelatedCommitFileResponse{}, nil
+	}
 
 	// Step 2: similarity search
 	var results []models.RelatedCommitFileResponse
