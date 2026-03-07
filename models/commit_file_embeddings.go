@@ -7,15 +7,15 @@ import (
 )
 
 type CommitFileEmbedding struct {
-	ID               int64           `json:"id" db:"id"`
+	ID               int64           `json:"id" gorm:"primaryKey"`
 	Embedding        pgvector.Vector `gorm:"type:vector(1536);not null"`
-	CommitFileID     int64           `json:"commit_file_id" db:"commit_file_id"`
-	GithubCommitID   int64           `json:"github_commit_id" db:"github_commit_id"`
-	GithubRepoID     int64           `json:"github_repo_id" db:"github_repo_id"`
-	InstallationID   int64           `json:"installation_id" db:"installation_id"`
-	GithubAuthorName *string         `json:"github_author_name,omitempty" db:"github_author_name"`
-	PlatformUserID   *int64          `json:"platform_user_id,omitempty" db:"platform_user_id"`
-	CreatedAt        time.Time       `json:"created_at" db:"created_at"`
+	CommitFileID     int64           `json:"commit_file_id" gorm:"uniqueIndex;not null"`
+	GithubCommitID   int64           `json:"github_commit_id" gorm:"not null"`
+	GithubRepoID     int64           `json:"github_repo_id" gorm:"index;not null"`
+	InstallationID   int64           `json:"installation_id" gorm:"index;not null"`
+	GithubAuthorName *string         `json:"github_author_name,omitempty"`
+	PlatformUserID   *int64          `json:"platform_user_id,omitempty"`
+	CreatedAt        time.Time       `json:"created_at" gorm:"autoCreateTime"`
 }
 
 type EmbedCommitFile2 struct {

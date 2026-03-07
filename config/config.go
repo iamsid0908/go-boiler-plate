@@ -25,6 +25,7 @@ type Configuration struct {
 	AzureOpenAIKey         string `env:"AZURE_OPENAI_KEY"`
 	AzureOpenAIModel       string `env:"AZURE_OPENAI_MODEL"`
 	AzureEmbeddingEndpoint string `env:"AZURE_EMBEDDING_ENDPOINT"`
+	RedisAddr              string `env:"REDIS_ADDR"`
 }
 
 func GetConfig() Configuration {

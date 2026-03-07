@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"core/domain"
 	"core/models"
+	"core/queue"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,47 @@ type GitHubRepositoryService struct {
 	GitHubCommitsDomain       domain.GitHubCommitsDomain
 	GitHubCommitFilesDomain   domain.GitHubCommitFilesDomain
 	CommitFileEmbeddingDomain domain.CommitFileEmbeddingDomain
+	QueueClient               *queue.Client
+}
+
+// BackfillEmbeddings queues embedding tasks for every commit file that has no
+// embedding yet.  Returns the number of tasks enqueued.
+func (g *GitHubRepositoryService) BackfillEmbeddings() (int, error) {
+	if g.QueueClient == nil {
+		return 0, fmt.Errorf("queue client not configured")
+	}
+
+	files, err := g.GitHubCommitFilesDomain.GetUnembeddedCommitFiles()
+	if err != nil {
+		return 0, fmt.Errorf("failed to fetch unembedded files: %w", err)
+	}
+
+	enqueued := 0
+	for _, f := range files {
+		// Apply the same extension filter used during normal ingestion
+		if !isEmbeddableFile(f.Filename) {
+			continue
+		}
+		if err := g.QueueClient.EnqueueEmbedCommitFile(queue.EmbedCommitFilePayload{
+			RepoFullName:  f.FullName,
+			RepoGithubID:  f.GithubRepoID,
+			RepoInstallID: f.InstallationID,
+			CommitID:      f.GithubCommitID,
+			CommitSHA:     "",
+			CommitMessage: f.Message,
+			AuthorName:    f.Author,
+			FileID:        f.CommitFileID,
+			Filename:      f.Filename,
+			Patch:         f.Patch,
+		}); err != nil {
+			fmt.Printf("[backfill] failed to enqueue file_id=%d: %v\n", f.CommitFileID, err)
+			continue
+		}
+		enqueued++
+	}
+
+	fmt.Printf("[backfill] enqueued %d / %d unembedded files\n", enqueued, len(files))
+	return enqueued, nil
 }
 
 func (g *GitHubRepositoryService) GetRepositoryActivity(repoID, days int64) ([]models.CommitActivity, error) {
@@ -74,7 +116,7 @@ func (g *GitHubRepositoryService) ExplainCommitFileChange(param models.ExplainCo
 
 	// Build prompts
 	systemPrompt := g.buildSystemPrompt()
-	userPrompt := g.buildUserPrompt(mainCommitFile, relatedFilesContext, len(data))
+	userPrompt := g.buildUserPrompt(mainCommitFile, relatedFilesContext, len(data), param.Question)
 
 	// Log token estimation (rough: 1 token ≈ 4 chars)
 	estimatedTokens := (len(systemPrompt) + len(userPrompt)) / 4
@@ -193,7 +235,7 @@ func (g *GitHubRepositoryService) buildSystemPrompt() string {
 Be concise and technical.`
 }
 
-func (g *GitHubRepositoryService) buildUserPrompt(mainCommitFile models.GitHubCommitFiles, relatedFilesContext string, relatedCount int) string {
+func (g *GitHubRepositoryService) buildUserPrompt(mainCommitFile models.GitHubCommitFiles, relatedFilesContext string, relatedCount int, question string) string {
 	const maxMainPatchChars = 1000
 
 	// Truncate main file patch if too long
@@ -213,8 +255,10 @@ Patch:
 RELATED CHANGES (%d similar commits):
 %s
 
-Provide a brief explanation of what changed, why, and any patterns from historical changes.`,
-		mainCommitFile.Filename, mainCommitFile.Status,
+Provide a brief explanation of what changed, why, and any patterns from historical changes.
+
+QUESTION:
+%s`, mainCommitFile.Filename, mainCommitFile.Status,
 		mainCommitFile.Additions, mainCommitFile.Deletions, mainPatch,
-		relatedCount, relatedFilesContext)
+		relatedCount, relatedFilesContext, question)
 }

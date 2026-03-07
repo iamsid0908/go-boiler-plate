@@ -68,5 +68,6 @@ func v1Routes(g *echo.Group, h AppModel) {
 	githubRepo.GET("/repos/:repo_id/commits/:commit_sha", h.GitHubRepository.GetCommitDetails)
 	githubRepo.GET("/commit-files/:commit_file_id/related", h.GitHubRepository.GetRelatedCommitFiles)
 	githubRepo.POST("/commit-files/:commit_file_id/explain", h.GitHubRepository.ExplainCommitFileChange)
+	githubRepo.POST("/backfill-embeddings", h.GitHubRepository.BackfillEmbeddings)
 
 }
