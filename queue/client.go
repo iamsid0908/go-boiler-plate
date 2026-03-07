@@ -41,7 +41,7 @@ func (c *Client) EnqueueFetchAndStoreRepos(payload FetchAndStoreReposPayload) er
 
 	info, err := c.client.EnqueueContext(context.Background(), task)
 	if err != nil {
-		return fmt.Errorf("failed to enqueue FetchAndStoreRepos: %w", err)
+		return fmt.Errorf("failed to enqueue FetchAndStore http://localhost:3000Repos: %w", err)
 	}
 	log.Printf("[queue] Enqueued task %s: id=%s queue=%s", TypeFetchAndStoreRepos, info.ID, info.Queue)
 	return nil

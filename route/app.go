@@ -133,6 +133,7 @@ func App() AppModel {
 		GitHubCommitsDomain:       gitHubCommitsDomain,
 		GitHubCommitFilesDomain:   gitHubCommitFilesDomain,
 		CommitFileEmbeddingDomain: commitFileEmbeddingDomain,
+		QueueClient:               queueClient,
 	}
 
 	//handler

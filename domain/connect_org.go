@@ -133,7 +133,17 @@ func (c *ConnectOrgDomainCtx) StoreInstallation(param models.GitHubInstallation)
 		WorkspaceID:    param.WorkspaceID,
 	}
 
-	if err := db.Create(&newInstallation).Error; err != nil {
+	// Omit user_id and workspace_id when they are 0 (unclaimed installation from webhook).
+	// Inserting 0 would violate the FK constraint; NULL is the correct value for unclaimed rows.
+	createQuery := db
+	if newInstallation.UserID == 0 {
+		createQuery = createQuery.Omit("UserID")
+	}
+	if newInstallation.WorkspaceID == 0 {
+		createQuery = createQuery.Omit("WorkspaceID")
+	}
+
+	if err := createQuery.Create(&newInstallation).Error; err != nil {
 		return "", err
 	}
 

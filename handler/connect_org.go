@@ -154,8 +154,9 @@ func (h *ConnectOrgHandler) HandleWebhook(c echo.Context) error {
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return c.JSON(500, map[string]string{"error": err.Error()})
 		}
-
+		log.Println("real ", existing)
 		if existing == nil {
+			log.Println("existing")
 			params := models.GitHubInstallation{
 				InstallationID: payload.Installation.ID,
 				AccountLogin:   payload.Installation.Account.Login,

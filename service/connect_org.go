@@ -162,7 +162,8 @@ func (c *ConnectOrgService) StoreRepositoriesAndCommits(installationID, userID i
 				fileParams.ID = fileId
 
 				// Enqueue embedding task for this file
-				if shouldEmbed(fileParams) {
+				if ok, reason := shouldEmbedWithReason(fileParams); ok {
+					fmt.Printf("[DEBUG-EMBED] Enqueuing embed for file_id=%d filename=%s\n", fileParams.ID, fileParams.Filename)
 					if err := c.QueueClient.EnqueueEmbedCommitFile(queue.EmbedCommitFilePayload{
 						RepoFullName:  repoParams.FullName,
 						RepoGithubID:  repoParams.GithubRepoID,
@@ -175,8 +176,10 @@ func (c *ConnectOrgService) StoreRepositoriesAndCommits(installationID, userID i
 						Filename:      fileParams.Filename,
 						Patch:         fileParams.Patch,
 					}); err != nil {
-						fmt.Printf("Error enqueuing embed for file %s: %v\n", fileParams.Filename, err)
+						fmt.Printf("[DEBUG-EMBED] Error enqueuing embed for file %s: %v\n", fileParams.Filename, err)
 					}
+				} else {
+					fmt.Printf("[DEBUG-EMBED] SKIP embed file_id=%d filename=%s reason=%s\n", fileParams.ID, fileParams.Filename, reason)
 				}
 			}
 		}
@@ -185,28 +188,33 @@ func (c *ConnectOrgService) StoreRepositoriesAndCommits(installationID, userID i
 }
 
 func shouldEmbed(file models.GitHubCommitFiles) bool {
+	ok, _ := shouldEmbedWithReason(file)
+	return ok
+}
+
+func shouldEmbedWithReason(file models.GitHubCommitFiles) (bool, string) {
 	// 1. Must have a diff
 	if strings.TrimSpace(file.Patch) == "" {
-		return false
+		return false, "empty patch"
 	}
 
 	// 2. Skip removed files
 	if file.Status == "removed" {
-		return false
+		return false, "status=removed"
 	}
 
 	// 3. File extension filter
 	if !isEmbeddableFile(file.Filename) {
-		return false
+		return false, fmt.Sprintf("non-embeddable extension (%s)", path.Ext(file.Filename))
 	}
 
 	// 4. Size guard (important)
 	const maxPatchSize = 6000 // characters
 	if len(file.Patch) > maxPatchSize {
-		return false
+		return false, fmt.Sprintf("patch too large (%d chars > %d)", len(file.Patch), maxPatchSize)
 	}
 
-	return true
+	return true, ""
 }
 
 // isEmbeddableFile checks if file type should be embedded
@@ -598,7 +606,8 @@ func (c *ConnectOrgService) HandlePushEvent(params models.GitHubPushEvent) error
 			fileParams.ID = fileId
 
 			// Enqueue embedding task for this file
-			if shouldEmbed(fileParams) {
+			if ok, reason := shouldEmbedWithReason(fileParams); ok {
+				fmt.Printf("[DEBUG-EMBED] Enqueuing embed for file_id=%d filename=%s\n", fileId, file.Filename)
 				if err := c.QueueClient.EnqueueEmbedCommitFileV2(queue.EmbedCommitFileV2Payload{
 					CommitFileID:   fileId,
 					GitHubRepoID:   data.GithubRepoID,
@@ -610,8 +619,10 @@ func (c *ConnectOrgService) HandlePushEvent(params models.GitHubPushEvent) error
 					Message:        commits.CommitMessage,
 					Patch:          file.Patch,
 				}); err != nil {
-					fmt.Printf("Error enqueuing embed for file %s: %v\n", file.Filename, err)
+					fmt.Printf("[DEBUG-EMBED] Error enqueuing embed for file %s: %v\n", file.Filename, err)
 				}
+			} else {
+				fmt.Printf("[DEBUG-EMBED] SKIP embed file_id=%d filename=%s reason=%s\n", fileId, file.Filename, reason)
 			}
 		}
 	}
