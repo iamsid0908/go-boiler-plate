@@ -2,6 +2,7 @@ package service
 
 import (
 	"bytes"
+	"core/config"
 	"core/domain"
 	"core/models"
 	"core/queue"
@@ -141,7 +142,7 @@ func (g *GitHubRepositoryService) ExplainCommitFileChange(param models.ExplainCo
 }
 
 func (g *GitHubRepositoryService) callAIService(systemPrompt, userPrompt string) (string, error) {
-	const aiServiceURL = g.Config.AiBackendUrl + "/explain-commit-file-change"
+	aiServiceURL := config.GetConfig().AiBackendUrl + "/explain-commit-file-change"
 
 	// Prepare request payload
 	requestBody := map[string]string{
