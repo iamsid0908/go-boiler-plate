@@ -211,7 +211,7 @@ func ParseJWTParamFromUser(user models.User, now time.Time) models.JWTPayload {
 		Language: user.Language,
 		StandardClaims: jwt.StandardClaims{
 			IssuedAt:  now.Unix(),
-			ExpiresAt: now.Add(time.Hour * 72).Unix(),
+			ExpiresAt: now.Add(time.Hour * 24 * 10).Unix(),
 		},
 	}
 
