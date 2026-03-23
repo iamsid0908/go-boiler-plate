@@ -48,7 +48,6 @@ func (workspaceHandler *WorkspaceHandler) GetWorkspaceById(c echo.Context) error
 		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: err.Error()})
 	}
 	userId := c.Get("id").(int64)
-	fmt.Println(userId)
 	param.UserID = userId
 	data, err := workspaceHandler.WorkspaceService.GetWorkspaceById(param)
 	if err != nil {
@@ -70,7 +69,6 @@ func (workspaceHandler *WorkspaceHandler) AddUserInWorkspace(c echo.Context) err
 	userId := c.Get("id").(int64)
 	role := c.Get("role").(string)
 
-	fmt.Println(userId)
 	param.AddedByID = userId
 	param.AddedByUserRole = role
 	data, err := workspaceHandler.WorkspaceService.AddUserInWorkspace(param)
@@ -99,7 +97,6 @@ func (workspaceHandler *WorkspaceHandler) AcceptInvite(c echo.Context) error {
 	if param.WorkspaceID == 0 {
 		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid workspace id"})
 	}
-	fmt.Println("param--", param)
 	data, err := workspaceHandler.WorkspaceService.AcceptInvite(param)
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
@@ -157,7 +154,6 @@ func (workspaceHandler *WorkspaceHandler) GetAllWorkspace(c echo.Context) error 
 func (workspaceHandler *WorkspaceHandler) GetAllRepository(c echo.Context) error {
 	userId := c.Get("id").(int64)
 	workspaceIDStr := c.QueryParam("workspace_id")
-	fmt.Println(userId, workspaceIDStr)
 	if userId == 0 || workspaceIDStr == "" {
 		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid user id or workspace id"})
 	}
@@ -179,7 +175,6 @@ func (workspaceHandler *WorkspaceHandler) GetAllRepository(c echo.Context) error
 func (workspaceHandler *WorkspaceHandler) GetOrgDetails(c echo.Context) error {
 	userId := c.Get("id").(int64)
 	workspaceIDStr := c.QueryParam("workspace_id")
-	fmt.Println(userId, workspaceIDStr)
 	if userId == 0 || workspaceIDStr == "" {
 		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid user id or workspace id"})
 	}

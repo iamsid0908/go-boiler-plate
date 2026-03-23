@@ -12,6 +12,7 @@ import (
 type CommitFileEmbeddingDomain interface {
 	StoreEmbedding(embeddingRow models.CommitFileEmbedding) error
 	GetRelatedCommitFiles(commitFileID string) ([]models.RelatedCommitFileResponse, error)
+	VectorSearchByWorkspace(queryEmbedding pgvector.Vector, workspaceID int64, limit int) ([]models.WorkspaceSearchResult, error)
 }
 
 type CommitFileEmbeddingDomainCtx struct{}
@@ -173,6 +174,38 @@ func (g *CommitFileEmbeddingDomainCtx) GetRelatedCommitFiles(commitFileID string
 	fmt.Printf("[DEBUG-RELATED] Similarity search returned %d results\n", len(results))
 	for i, r := range results {
 		fmt.Printf("[DEBUG-RELATED]   result[%d]: file_id=%d, filename=%s, similarity=%.4f\n", i, r.CommitFileID, r.Filename, r.Similarity)
+	}
+
+	return results, nil
+}
+
+func (c *CommitFileEmbeddingDomainCtx) VectorSearchByWorkspace(queryEmbedding pgvector.Vector, workspaceID int64, limit int) ([]models.WorkspaceSearchResult, error) {
+	db := config.DbManager()
+
+	var results []models.WorkspaceSearchResult
+	err := db.Raw(`
+		SELECT
+			cfe.commit_file_id,
+			c.commit_sha,
+			f.filename,
+			gr.name        AS repo_name,
+			gr.full_name   AS repo_full_name,
+			c.github_author_name AS author,
+			c.committed_at,
+			f.patch,
+			1 - (cfe.embedding <=> ?) AS similarity
+		FROM commit_file_embedding cfe
+		JOIN git_hub_commit_files f  ON f.id  = cfe.commit_file_id
+		JOIN git_hub_commits c       ON c.id  = f.github_commit_id
+		JOIN git_hub_repository gr   ON gr.github_repo_id = cfe.github_repo_id
+		JOIN github_installations gi ON gi.installation_id = cfe.installation_id
+		WHERE gi.workspace_id = ?
+		ORDER BY cfe.embedding <=> ?
+		LIMIT ?
+	`, queryEmbedding, workspaceID, queryEmbedding, limit).Scan(&results).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("workspace vector search failed: %w", err)
 	}
 
 	return results, nil

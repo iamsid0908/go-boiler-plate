@@ -1,7 +1,6 @@
 package config
 
 import (
-	"core/models"
 	"fmt"
 	"log"
 
@@ -33,7 +32,7 @@ func DbInit() {
 	fmt.Println("Connected to Database")
 
 	// Uncomment if you have models to migrate
-	err = db.AutoMigrate(&models.CommitFileEmbedding{})
+	err = db.AutoMigrate()
 	if err != nil {
 		log.Fatalf("Migration failed: %v", err)
 	}

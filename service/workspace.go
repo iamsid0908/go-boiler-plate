@@ -16,7 +16,6 @@ type WorkspaceService struct {
 	WorkspaceDomain           domain.WorkspaceDomain
 	ManageWorkspaceDomain     domain.ManageWorkspaceDomain
 	ChannelDomain             domain.ChannelDomain
-	DocumentDomain            domain.DocumentDomain
 	CredentialsDomain         domain.CredentialsDomain
 	ManageChannelsDomain      domain.ManageChannelsDomain
 	UserDomain                domain.UserDomain
@@ -106,7 +105,6 @@ func (c *WorkspaceService) GetWorkspaceById(param models.GetWorkspaceByIdReqs) (
 	if err != nil {
 		return models.GetWorkspaceByIdResp{}, err
 	}
-	fmt.Println("workspace-0090991211", workspace)
 	manageChannelParam := models.ManageChannels{
 		WorkspaceID:  param.WorkspaceID,
 		JoinedUserID: param.UserID,
@@ -135,7 +133,6 @@ func (c *WorkspaceService) AddUserInWorkspace(param models.AddUserInWorkspaceReq
 	if err != nil {
 		return models.BasicResp{}, fmt.Errorf("failed to get owner id: %w", err)
 	}
-	fmt.Println("userWhoIsAddingRole", userWhoIsAddingRole)
 	if userWhoIsAddingRole.Role != "admin" {
 		return models.BasicResp{}, fmt.Errorf("only admin can add user in workspace")
 	}
@@ -224,7 +221,6 @@ func (c *WorkspaceService) AcceptInvite(param models.AcceptInviteReqs) (models.B
 	if err != nil {
 		return models.BasicResp{}, err
 	}
-	fmt.Println("publicChannels", publicChannels)
 	for _, channel := range publicChannels {
 		manageChannelParam := models.ManageChannels{
 			ChannelID:    channel.ChannelID,
@@ -284,13 +280,13 @@ func (c *WorkspaceService) GetRepoCommits(param models.GetRepoCommitsReqs) (mode
 	return commits, nil
 }
 
-func (c *WorkspaceService) GetCommitFilesDetails(commitId int64) (models.GitHubCommitFiles, error) {
+func (c *WorkspaceService) GetCommitFilesDetails(commitId int64) ([]models.GitHubCommitFiles, error) {
 	commitParam := models.GitHubCommitFiles{
 		GithubCommitID: commitId,
 	}
 	data, err := c.GitHubCommitFilesDomain.GetCommitFilesDetailsByCommitId(commitParam)
 	if err != nil {
-		return models.GitHubCommitFiles{}, err
+		return nil, err
 	}
 	return data, nil
 }

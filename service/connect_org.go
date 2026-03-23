@@ -370,7 +370,6 @@ func (c *ConnectOrgService) EmbedCommitFile(
 	if err != nil {
 		return fmt.Errorf("failed to generate embedding: %w", err)
 	}
-	fmt.Println("Generated embedding of length:", len(embedding))
 
 	// Store in pgvector table
 	embeddingRow := models.CommitFileEmbedding{
@@ -406,7 +405,6 @@ func (c *ConnectOrgService) EmbedCommitFile2(param models.EmbedCommitFile2) erro
 	if err != nil {
 		return fmt.Errorf("failed to generate embedding: %w", err)
 	}
-	fmt.Println("Generated embedding of length:", len(embedding))
 
 	// Store in pgvector table
 	embeddingRow := models.CommitFileEmbedding{
@@ -462,7 +460,6 @@ func (c *ConnectOrgService) GenerateInstallationToken(param models.GenerateInsta
 		"https://api.github.com/app/installations/%d/access_tokens",
 		installation,
 	)
-	// fmt.Println("Generated URL:", url, "appJWT:", appJWT)
 
 	token, err := c.ConnectOrgDomain.GenerateInstallationToken(appJWT, url)
 	if err != nil {
@@ -472,14 +469,9 @@ func (c *ConnectOrgService) GenerateInstallationToken(param models.GenerateInsta
 }
 
 func GenerateGitHubAppJWT() (string, error) {
-	privateKeyPath := config.GetConfig().GitHubPrivateKeyPath
+	keyData := strings.ReplaceAll(config.GetConfig().GitHubPrivateKey, `\n`, "\n")
 
-	privateKeyBytes, err := os.ReadFile(privateKeyPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read private key file: %w", err)
-	}
-
-	block, _ := pem.Decode(privateKeyBytes)
+	block, _ := pem.Decode([]byte(keyData))
 	if block == nil {
 		return "", errors.New("failed to decode PEM block")
 	}

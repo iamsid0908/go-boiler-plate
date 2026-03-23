@@ -113,7 +113,6 @@ func (c *AuthService) ResendOTP(param *models.ResendOTPRequest) error {
 }
 
 func (c *AuthService) VerifyOTP(param models.VerifyOTPRequest) error {
-	fmt.Println(param)
 	user, err := c.UserDomain.Get(models.GetUserParam{ID: param.Id, Email: param.Email})
 	if err != nil {
 		return err
@@ -181,6 +180,42 @@ func (c *AuthService) LoginUser(param models.LogInRequest) (models.LogInResponse
 		Redirect:  "/dashboard",
 	}
 	return resp, nil
+}
+
+func (c *AuthService) GoogleLogin(email, name string) (models.LogInResponse, error) {
+	user, err := c.UserDomain.Get(models.GetUserParam{Email: email})
+	if err != nil {
+		if err.Error() != "user not found" {
+			return models.LogInResponse{}, err
+		}
+		// New Google user — create them with no password, already active
+		user, err = c.UserDomain.Insert(models.User{
+			Email:    email,
+			Name:     name,
+			Role:     "customer",
+			Language: utils.UserLanguageEn,
+			IsActive: true,
+		})
+		if err != nil {
+			return models.LogInResponse{}, err
+		}
+	}
+
+	now := time.Now()
+	payload := ParseJWTParamFromUser(user, now)
+	token, err := GenerateJWT(payload)
+	if err != nil {
+		return models.LogInResponse{}, err
+	}
+
+	return models.LogInResponse{
+		ID:       user.ID,
+		Email:    user.Email,
+		Name:     user.Name,
+		Role:     user.Role,
+		Token:    token,
+		Redirect: "/dashboard",
+	}, nil
 }
 
 func (c *AuthService) validateLogIn(param models.LogInRequest, user models.User) error {

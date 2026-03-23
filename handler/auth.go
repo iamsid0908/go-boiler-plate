@@ -1,14 +1,21 @@
 package handler
 
 import (
+	"context"
+	"core/config"
 	"core/handler/validation"
 	"core/models"
 	"core/service"
 	"core/utils"
+	"crypto/rand"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 type AuthHandler struct {
@@ -165,6 +172,96 @@ func (authHandler *AuthHandler) ValidateSession(c echo.Context) error {
 		Data:    userData,
 	}
 	return c.JSON(http.StatusOK, resp)
+}
+
+func googleOAuthConfig() *oauth2.Config {
+	cfg := config.GetConfig()
+	return &oauth2.Config{
+		ClientID:     cfg.GoogleClientID,
+		ClientSecret: cfg.GoogleClientSecret,
+		RedirectURL:  cfg.GoogleRedirectURL,
+		Scopes:       []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"},
+		Endpoint:     google.Endpoint,
+	}
+}
+
+func generateState() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
+}
+
+// GoogleAuthURL returns the Google OAuth consent page URL.
+func (authHandler *AuthHandler) GoogleAuthURL(c echo.Context) error {
+	state := generateState()
+	c.SetCookie(&http.Cookie{
+		Name:     "oauth_state",
+		Value:    state,
+		HttpOnly: true,
+		Secure:   true,
+		Path:     "/",
+		MaxAge:   300,
+		SameSite: http.SameSiteLaxMode,
+	})
+	url := googleOAuthConfig().AuthCodeURL(state)
+	return c.JSON(http.StatusOK, models.BasicResp{
+		Message: utils.Success,
+		Data:    map[string]string{"url": url},
+	})
+}
+
+// GoogleOAuthCallback handles the redirect from Google, upserts the user, and sets the JWT cookie.
+func (authHandler *AuthHandler) GoogleOAuthCallback(c echo.Context) error {
+	// Validate CSRF state
+	state := c.QueryParam("state")
+	stateCookie, err := c.Cookie("oauth_state")
+	if err != nil || stateCookie.Value != state || state == "" {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid oauth state"})
+	}
+	c.SetCookie(&http.Cookie{Name: "oauth_state", Value: "", MaxAge: -1, Path: "/"})
+
+	code := c.QueryParam("code")
+	if code == "" {
+		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "code is required"})
+	}
+
+	oauthToken, err := googleOAuthConfig().Exchange(context.Background(), code)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: "failed to exchange code: " + err.Error()})
+	}
+
+	client := googleOAuthConfig().Client(context.Background(), oauthToken)
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: "failed to fetch user info"})
+	}
+	defer resp.Body.Close()
+
+	var googleUser struct {
+		Email string `json:"email"`
+		Name  string `json:"name"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&googleUser); err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: "failed to parse user info"})
+	}
+
+	data, err := authHandler.AuthService.GoogleLogin(googleUser.Email, googleUser.Name)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
+	}
+
+	c.SetCookie(&http.Cookie{
+		Name:     "Bearer",
+		Value:    data.Token,
+		HttpOnly: true,
+		Secure:   true,
+		Path:     "/",
+		MaxAge:   86400,
+		SameSite: http.SameSiteNoneMode,
+	})
+
+	frontendURL := config.GetConfig().FrontendUrl
+	return c.Redirect(http.StatusTemporaryRedirect, frontendURL+data.Redirect)
 }
 
 func (authHandler *AuthHandler) GithubOAuthCallback(c echo.Context) error {

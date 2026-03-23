@@ -16,12 +16,8 @@ type AppModel struct {
 	User             handler.UserHandler
 	Auth             handler.AuthHandler
 	Role             handler.RoleHandler
-	Book             handler.BookHandler
-	BookSummary      handler.BookSummaryHandler
-	Cart             handler.CartHandler
 	Workspace        handler.WorkspaceHandler
 	Channel          handler.ChannelHandler
-	Document         handler.DocumentHandler
 	ManageWorkspace  handler.ManageWorkspaceHandler
 	ManageChannels   handler.ManageChannelsHandler
 	Credentials      handler.CredentialsHandler
@@ -31,11 +27,13 @@ type AppModel struct {
 
 func App() AppModel {
 	// Initialize queue client
-	redisAddr := config.GetConfig().RedisAddr
+	cfg := config.GetConfig()
+	redisAddr := cfg.RedisAddr
 	if redisAddr == "" {
 		redisAddr = "localhost:6379" // default
 	}
-	queueClient := queue.NewClient(redisAddr)
+	redisPassword := cfg.RedisPassword
+	queueClient := queue.NewClient(redisAddr, redisPassword)
 	log.Printf("[queue] Client connected to Redis at %s", redisAddr)
 
 	//domain
@@ -43,12 +41,8 @@ func App() AppModel {
 	authDomain := &domain.AuthDomainCtx{}
 	userDomain := &domain.UserDomainCtx{}
 	roleDomain := &domain.RoleDomainCtx{}
-	bookDomain := &domain.BookDomainCtx{}
-	bookSummaryDomain := &domain.BookSummaryDomainCtx{}
-	cartDomain := &domain.CartDomainCtx{}
 	workspaceDomain := &domain.WorkspaceDomainCtx{}
 	channelDomain := &domain.ChannelDomainCtx{}
-	documentDomain := &domain.DocumentDomainCtx{}
 	manageWorkspaceDomain := &domain.ManageWorkspaceDomainCtx{}
 	manageChannelsDomain := &domain.ManageChannelsDomainCtx{}
 	credentialsDomain := &domain.CredentialsDomainCtx{}
@@ -73,21 +67,10 @@ func App() AppModel {
 	roleService := service.RoleService{
 		RoleDomain: roleDomain,
 	}
-	bookService := service.BookService{
-		BookDomain:        bookDomain,
-		BookSummaryDomain: bookSummaryDomain,
-	}
-	bookSummaryService := service.BookSummaryService{
-		BookSummaryDomain: bookSummaryDomain,
-	}
-	cartService := service.CartService{
-		CartDomain: cartDomain,
-	}
 	workspaceService := service.WorkspaceService{
 		WorkspaceDomain:           workspaceDomain,
 		ManageWorkspaceDomain:     manageWorkspaceDomain,
 		ChannelDomain:             channelDomain,
-		DocumentDomain:            documentDomain,
 		CredentialsDomain:         credentialsDomain,
 		ManageChannelsDomain:      manageChannelsDomain,
 		UserDomain:                userDomain,
@@ -102,9 +85,7 @@ func App() AppModel {
 		UserDomain:            userDomain,
 		ManageWorkspaceDomain: manageWorkspaceDomain,
 	}
-	documentService := service.DocumentService{
-		DocumentDomain: documentDomain,
-	}
+
 	manageWorkspaceService := service.ManageWorkspaceService{
 		ManageWorkspaceDomain: manageWorkspaceDomain,
 	}
@@ -126,7 +107,7 @@ func App() AppModel {
 	// Start the asynq worker server (processes enqueued tasks in background)
 	mux := asynq.NewServeMux()
 	RegisterTaskHandlers(mux, &connectOrgService)
-	queue.StartWorker(redisAddr, mux)
+	queue.StartWorker(redisAddr, redisPassword, mux)
 
 	gitHubRepositoryService := service.GitHubRepositoryService{
 		GitHubRepositoryDomain:    gitHubRepositoryDomain,
@@ -149,24 +130,14 @@ func App() AppModel {
 	roleHandler := handler.RoleHandler{
 		RoleService: roleService,
 	}
-	bookHandler := handler.BookHandler{
-		BookService: bookService,
-	}
-	bookSummaryHandler := handler.BookSummaryHandler{
-		BookSummaryService: bookSummaryService,
-	}
-	cartHandler := handler.CartHandler{
-		CartService: cartService,
-	}
+
 	workspaceHandler := handler.WorkspaceHandler{
 		WorkspaceService: workspaceService,
 	}
 	channelHandler := handler.ChannelHandler{
 		ChannelService: channelService,
 	}
-	documentHandler := handler.DocumentHandler{
-		DocumentService: documentService,
-	}
+
 	manageWorkspaceHandler := handler.ManageWorkspaceHandler{
 		ManageWorkspaceService: manageWorkspaceService,
 	}
@@ -188,12 +159,8 @@ func App() AppModel {
 		User:             userHandler,
 		Auth:             authHandler,
 		Role:             roleHandler,
-		Book:             bookHandler,
-		BookSummary:      bookSummaryHandler,
-		Cart:             cartHandler,
 		Workspace:        workspaceHandler,
 		Channel:          channelHandler,
-		Document:         documentHandler,
 		ManageWorkspace:  manageWorkspaceHandler,
 		ManageChannels:   manageChannelsHandler,
 		Credentials:      credentialsHandler,

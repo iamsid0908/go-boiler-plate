@@ -6,19 +6,18 @@ import (
 	"encoding/pem"
 	"errors"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
 )
 
 func loadPrivateKey() (*rsa.PrivateKey, error) {
-	keyPath := os.Getenv("GITHUB_PRIVATE_KEY_PATH")
-	keyData, err := os.ReadFile(keyPath)
-	if err != nil {
-		return nil, err
-	}
+	keyData := os.Getenv("GITHUB_PRIVATE_KEY")
+	// Allow \n literals in the env var to be treated as real newlines
+	keyData = strings.ReplaceAll(keyData, `\n`, "\n")
 
-	block, _ := pem.Decode(keyData)
+	block, _ := pem.Decode([]byte(keyData))
 	if block == nil {
 		return nil, errors.New("failed to decode PEM block")
 	}

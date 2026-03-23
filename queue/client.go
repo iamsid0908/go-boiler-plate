@@ -16,8 +16,8 @@ type Client struct {
 }
 
 // NewClient creates a new queue client connected to Redis
-func NewClient(redisAddr string) *Client {
-	c := asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr})
+func NewClient(redisAddr, redisPassword string) *Client {
+	c := asynq.NewClient(asynq.RedisClientOpt{Addr: redisAddr, Password: redisPassword})
 	return &Client{client: c}
 }
 

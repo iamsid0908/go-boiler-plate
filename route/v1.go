@@ -17,25 +17,11 @@ func v1Routes(g *echo.Group, h AppModel) {
 	auth.GET("/validate", h.Auth.ValidateSession, middleware.JWTVerify())
 	auth.GET("/logout", h.Auth.UserLogOut, middleware.JWTVerify())
 	auth.GET("/github/callback", h.Auth.GithubOAuthCallback, middleware.JWTVerify())
+	auth.GET("/google", h.Auth.GoogleAuthURL)
+	auth.GET("/google/callback", h.Auth.GoogleOAuthCallback)
 
 	user := g.Group("/user", middleware.JWTVerify())
 	user.GET("/get-user", h.User.GetUserName)
-
-	book := g.Group("/books", middleware.JWTVerify())
-	book.POST("/insert", h.Book.Insert)
-	book.GET("/getall", h.Book.GellAllBook)
-	book.POST("/bulk-insert", h.Book.BulkInsert)
-	book.POST("/recommendation/books", h.Book.Recommend)
-
-	booksummary := g.Group("/book-summary", middleware.JWTVerify())
-	booksummary.POST("/insert", h.BookSummary.Insert)
-	booksummary.GET("/book-detail/:book_id", h.BookSummary.GetBookDetails)
-
-	cart := g.Group("/cart", middleware.JWTVerify())
-	cart.POST("/insert", h.Cart.Insert)
-	cart.GET("/get-cart", h.Cart.GetCartByUserId)
-	cart.GET("/cart-size", h.Cart.GetSizeofCart)
-	cart.DELETE("/cart-remove", h.Cart.RemoveFromCart)
 
 	workspace := g.Group("/workspace", middleware.JWTVerify())
 	workspace.POST("/create", h.Workspace.CreateWorkspace)
@@ -47,6 +33,7 @@ func v1Routes(g *echo.Group, h AppModel) {
 	workspace.GET("/get_repo_commits/:repo_id", h.Workspace.GetRepoCommits)
 	workspace.GET("/get_commit_details/:github_commit_id", h.Workspace.GetCommitFilesDetails)
 	workspace.POST("/get_members", h.Workspace.GetWorkSpaceMembers)
+	workspace.POST("/:workspace_id/query", h.GitHubRepository.QueryWorkspace)
 
 	g.POST("/workspace/accept-invite", h.Workspace.AcceptInvite)
 	g.POST("/workspace/details", h.Workspace.GetWorkspaceDetails)

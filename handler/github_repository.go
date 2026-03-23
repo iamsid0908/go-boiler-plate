@@ -3,7 +3,6 @@ package handler
 import (
 	"core/models"
 	"core/service"
-	"fmt"
 	"net/http"
 	"strconv"
 
@@ -20,7 +19,6 @@ func (githubRepositoryHandler *GitHubRepositoryHandler) GetRepositoryActivity(c 
 	if days == "" {
 		days = "7"
 	}
-	fmt.Println("RepoID:", repoID, "Days:", days)
 	repoIDInt, err := strconv.ParseInt(repoID, 10, 64)
 	if err != nil {
 		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid repository id"})
@@ -82,6 +80,29 @@ func (githubRepositoryHandler *GitHubRepositoryHandler) ExplainCommitFileChange(
 		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
 	}
 	return c.JSON(http.StatusOK, explainedAnswer)
+}
+
+func (githubRepositoryHandler *GitHubRepositoryHandler) QueryWorkspace(c echo.Context) error {
+	workspaceID := c.Param("workspace_id")
+	workspaceIDInt, err := strconv.ParseInt(workspaceID, 10, 64)
+	if err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "invalid workspace_id"})
+	}
+
+	var req models.WorkspaceQueryRequest
+	if err := c.Bind(&req); err != nil {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": err.Error()})
+	}
+	if req.Query == "" {
+		return c.JSON(http.StatusBadRequest, echo.Map{"error": "query is required"})
+	}
+
+	response, err := githubRepositoryHandler.GitHubRepositoryService.QueryWorkspace(req.Query, workspaceIDInt)
+	if err != nil {
+		return c.JSON(http.StatusInternalServerError, echo.Map{"error": err.Error()})
+	}
+
+	return c.JSON(http.StatusOK, response)
 }
 
 // BackfillEmbeddings queues embedding tasks for all commit files that have no

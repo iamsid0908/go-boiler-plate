@@ -77,7 +77,7 @@ func (c *ManageWorkspaceDomainCtx) GetMembersByWorkspaceId(params models.Workspa
 	err := db.Table("manage_workspace").
 		Select("users.id as user_id, users.name as name, users.email as email, manage_workspace.role as role").
 		Joins("JOIN users ON manage_workspace.joined_user_id = users.id").
-		Where("manage_workspace.workspace_id = ?", params.ID).
+		Where("manage_workspace.workspace_id = ? AND manage_workspace.is_accepted = ?", params.ID, true).
 		Scan(&members).Error
 
 	if err != nil {

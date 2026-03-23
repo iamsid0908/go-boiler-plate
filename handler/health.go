@@ -3,7 +3,6 @@ package handler
 import (
 	"core/models"
 	"core/service"
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo"
@@ -18,7 +17,6 @@ func (healthHandler *HealthHandler) Check(c echo.Context) error {
 	if err != nil {
 		return c.JSON(http.StatusInternalServerError, models.BasicResp{Message: err.Error()})
 	}
-	fmt.Println("health")
 
 	resp := models.BasicResp{
 		Message: "Success",

@@ -82,6 +82,33 @@ type GetRepoCommitsReqs struct {
 	Page   int   `json:"page"`
 }
 
+type WorkspaceQueryRequest struct {
+	Query string `json:"query"`
+}
+
+type WorkspaceQuerySource struct {
+	FileName  string `json:"fileName"`
+	CommitSHA string `json:"commitSHA"`
+	RepoName  string `json:"repoName"`
+}
+
+type WorkspaceQueryResponse struct {
+	Answer  string                 `json:"answer"`
+	Sources []WorkspaceQuerySource `json:"sources"`
+}
+
+type WorkspaceSearchResult struct {
+	CommitFileID int64     `json:"commit_file_id"`
+	CommitSHA    string    `json:"commit_sha"`
+	Filename     string    `json:"filename"`
+	RepoName     string    `json:"repo_name"`
+	RepoFullName string    `json:"repo_full_name"`
+	Author       string    `json:"author"`
+	CommittedAt  time.Time `json:"committed_at"`
+	Patch        string    `json:"patch"`
+	Similarity   float64   `json:"similarity"`
+}
+
 type GitHubPushEvent struct {
 	Installation struct {
 		ID int64 `json:"id"`

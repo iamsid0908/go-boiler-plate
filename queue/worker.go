@@ -10,9 +10,9 @@ import (
 // StartWorker starts the asynq worker server.
 // Pass a fully configured ServeMux with all task handlers registered.
 // It starts processing in a background goroutine and returns the server for graceful shutdown.
-func StartWorker(redisAddr string, mux *asynq.ServeMux) *asynq.Server {
+func StartWorker(redisAddr, redisPassword string, mux *asynq.ServeMux) *asynq.Server {
 	srv := asynq.NewServer(
-		asynq.RedisClientOpt{Addr: redisAddr},
+		asynq.RedisClientOpt{Addr: redisAddr, Password: redisPassword},
 		asynq.Config{
 			// Total concurrent workers across all queues
 			Concurrency: 10,

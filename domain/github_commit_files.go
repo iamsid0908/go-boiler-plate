@@ -8,7 +8,7 @@ import (
 type GitHubCommitFilesDomain interface {
 	StoreCommitFile(params models.GitHubCommitFiles) (int64, error)
 	GetGitHubCommitFilesByID(commitFileID int64) (models.GitHubCommitFiles, error)
-	GetCommitFilesDetailsByCommitId(param models.GitHubCommitFiles) (models.GitHubCommitFiles, error)
+	GetCommitFilesDetailsByCommitId(param models.GitHubCommitFiles) ([]models.GitHubCommitFiles, error)
 	GetUnembeddedCommitFiles() ([]models.BackfillCommitFileRow, error)
 }
 
@@ -42,15 +42,15 @@ func (g *GitHubCommitFilesDomainCtx) GetGitHubCommitFilesByID(commitFileID int64
 
 }
 
-func (g *GitHubCommitFilesDomainCtx) GetCommitFilesDetailsByCommitId(param models.GitHubCommitFiles) (models.GitHubCommitFiles, error) {
+func (g *GitHubCommitFilesDomainCtx) GetCommitFilesDetailsByCommitId(param models.GitHubCommitFiles) ([]models.GitHubCommitFiles, error) {
 	db := config.DbManager()
 
-	var commitFileDetails models.GitHubCommitFiles
+	var commitFileDetails []models.GitHubCommitFiles
 
 	err := db.Where("github_commit_id = ?", param.GithubCommitID).Find(&commitFileDetails).Error
 
 	if err != nil {
-		return models.GitHubCommitFiles{}, err
+		return nil, err
 	}
 
 	return commitFileDetails, nil
