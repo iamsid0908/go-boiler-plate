@@ -104,7 +104,7 @@ func (connectOrgHandler *ConnectOrgHandler) HandleOrgCallback(c echo.Context) er
 		return c.JSON(500, models.BasicResp{Message: err.Error()})
 	}
 
-	return c.Redirect(302, "/dashboard")
+	return c.Redirect(302, config.GetConfig().FrontendUrl+"/dashboard")
 }
 
 func DecodeJwt(tokenString string) (jwt.MapClaims, error) {
