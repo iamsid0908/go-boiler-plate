@@ -93,8 +93,11 @@ type WorkspaceQuerySource struct {
 }
 
 type WorkspaceQueryResponse struct {
-	Answer  string                 `json:"answer"`
-	Sources []WorkspaceQuerySource `json:"sources"`
+	Answer      string                 `json:"answer"`
+	ActionItems []string               `json:"action_items"`
+	CodePatch   string                 `json:"code_patch"`
+	Impact      string                 `json:"impact"`
+	Sources     []WorkspaceQuerySource `json:"sources"`
 }
 
 type WorkspaceSearchResult struct {

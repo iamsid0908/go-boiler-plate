@@ -257,8 +257,9 @@ func (g *GitHubRepositoryService) QueryWorkspace(query string, workspaceID int64
 
 	if len(results) == 0 {
 		return models.WorkspaceQueryResponse{
-			Answer:  "No relevant code history found for this query in the workspace.",
-			Sources: []models.WorkspaceQuerySource{},
+			Answer:      "No relevant code history found for this query in the workspace.",
+			ActionItems: []string{},
+			Sources:     []models.WorkspaceQuerySource{},
 		}, nil
 	}
 
@@ -267,7 +268,14 @@ func (g *GitHubRepositoryService) QueryWorkspace(query string, workspaceID int64
 
 	// 4. Build prompts
 	systemPrompt := `You are an expert code analyst. Answer the user's question based on the provided commit history context.
-Be concise and technical. Reference specific files and commits when relevant.`
+Be concise and technical. Reference specific files and commits when relevant.
+You MUST respond with a valid JSON object (no markdown, no extra text) matching this schema:
+{
+  "answer": "<direct answer to the question>",
+  "action_items": ["<actionable step>", ...],
+  "code_patch": "<relevant unified diff or empty string>",
+  "impact": "<brief impact summary>"
+}`
 
 	userPrompt := fmt.Sprintf(`Based on the following commit history from the codebase, answer this question:
 
@@ -276,18 +284,33 @@ QUESTION: %s
 COMMIT HISTORY CONTEXT:
 %s
 
-Provide a clear, direct answer referencing the relevant changes.`, query, context)
+Respond ONLY with the JSON object described in the system prompt.`, query, context)
 
 	// 5. Call LLM
-	answer, err := g.callAzureChatCompletion(systemPrompt, userPrompt)
+	raw, err := g.callAzureChatCompletion(systemPrompt, userPrompt)
 	if err != nil {
 		return models.WorkspaceQueryResponse{}, fmt.Errorf("LLM call failed: %w", err)
 	}
 
-	// 6. Build sources (deduplicated by commit_file_id)
+	// 6. Parse structured LLM response
+	var llmResp struct {
+		Answer      string   `json:"answer"`
+		ActionItems []string `json:"action_items"`
+		CodePatch   string   `json:"code_patch"`
+		Impact      string   `json:"impact"`
+	}
+	if err := json.Unmarshal([]byte(raw), &llmResp); err != nil {
+		// Fallback: treat raw output as plain answer
+		llmResp.Answer = raw
+	}
+
+	// 7. Build sources (deduplicated by commit_file_id)
 	seen := make(map[int64]bool)
 	var sources []models.WorkspaceQuerySource
 	for _, r := range results {
+		if len(sources) >= 3 {
+			break
+		}
 		if seen[r.CommitFileID] {
 			continue
 		}
@@ -299,7 +322,13 @@ Provide a clear, direct answer referencing the relevant changes.`, query, contex
 		})
 	}
 
-	return models.WorkspaceQueryResponse{Answer: answer, Sources: sources}, nil
+	return models.WorkspaceQueryResponse{
+		Answer:      llmResp.Answer,
+		ActionItems: llmResp.ActionItems,
+		CodePatch:   llmResp.CodePatch,
+		Impact:      llmResp.Impact,
+		Sources:     sources,
+	}, nil
 }
 
 func (g *GitHubRepositoryService) buildWorkspaceContext(results []models.WorkspaceSearchResult) string {
