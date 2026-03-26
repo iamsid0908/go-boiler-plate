@@ -83,7 +83,12 @@ type GetRepoCommitsReqs struct {
 }
 
 type WorkspaceQueryRequest struct {
-	Query string `json:"query"`
+	Query     string `json:"query"`
+	Author    string `json:"author"`
+	DateRange struct {
+		StartDate time.Time `json:"start_date"`
+		EndDate   time.Time `json:"end_date"`
+	} `json:"date_range"`
 }
 
 type WorkspaceQuerySource struct {

@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/pgvector/pgvector-go"
 )
@@ -23,6 +24,7 @@ type GitHubRepositoryService struct {
 	GitHubCommitFilesDomain   domain.GitHubCommitFilesDomain
 	CommitFileEmbeddingDomain domain.CommitFileEmbeddingDomain
 	QueueClient               *queue.Client
+	AiDomain                  domain.AiDomain
 }
 
 // BackfillEmbeddings queues embedding tasks for every commit file that has no
@@ -238,7 +240,55 @@ func (g *GitHubRepositoryService) buildSystemPrompt() string {
 Be concise and technical.`
 }
 
-func (g *GitHubRepositoryService) QueryWorkspace(query string, workspaceID int64) (models.WorkspaceQueryResponse, error) {
+func (g *GitHubRepositoryService) QueryWorkspace(param models.WorkspaceQueryRequest, workspaceID int64) (models.WorkspaceQueryResponse, error) {
+	intent, err := g.AiDomain.ClassifyQueryIntent(param.Query)
+	if err != nil {
+		return models.WorkspaceQueryResponse{}, fmt.Errorf("failed to classify query intent: %w", err)
+	}
+
+	var context string
+	switch intent {
+	case "code_explanation":
+		context = g.semantic_search(param.Query, workspaceID)
+	case "get_commits_by_author_and_date":
+		author := param.Author
+		dateRange := param.DateRange
+		from, to := resolveDateRange(dateRange)
+		commits, _ := g.Domain.GetCommitsByAuthorAndDate(workspaceID, author, from, to)
+		context = buildCommitContext(commits)
+	case "get_recent_commits":
+		from, _ := resolveDateRange(param.DateRange)
+		commits, _ := g.AiDomain.GetRecentCommits(workspaceID, from)
+		context = buildCommitContext(commits)
+	default:
+		return models.WorkspaceQueryResponse{
+			Answer:      "Sorry, I can only answer questions related to code changes and commit history.",
+			ActionItems: []string{},
+			Sources:     []models.WorkspaceQuerySource{},
+		}, nil
+	}
+
+	answer, err := g.AiDomain.GenerateAnswer(query, context)
+	if err != nil {
+		return models.WorkspaceQueryResponse{}, fmt.Errorf("failed to generate answer: %w", err)
+	}
+
+	return models.WorkspaceQueryResponse{
+		Answer:      answer.Answer,
+		ActionItems: answer.ActionItems,
+		CodePatch:   answer.CodePatch,
+		Impact:      answer.Impact,
+	}, nil
+}
+
+func resolveDateRange(dateRange struct {
+	StartDate time.Time `json:"start_date"`
+	EndDate   time.Time `json:"end_date"`
+}) (time.Time, time.Time) {
+	return dateRange.StartDate, dateRange.EndDate
+}
+
+func (g *GitHubRepositoryService) semantic_search(query string, workspaceID int64) (models.WorkspaceQueryResponse, error) {
 	ctx := context.Background()
 
 	// 1. Generate query embedding
