@@ -92,7 +92,7 @@ func (c *ManageWorkspaceDomainCtx) GetAllWorkspaceByUserId(userId int64) []model
 
 	var userWorkspaces []models.ManageWorkspace
 	err := db.Table("manage_workspace").
-		Where("joined_user_id = ? ", userId).
+		Where("joined_user_id = ? AND is_accepted = ?", userId, true).
 		Find(&userWorkspaces).Error
 	if err != nil {
 		return nil

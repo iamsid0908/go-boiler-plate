@@ -83,6 +83,7 @@ func (workspaceHandler *WorkspaceHandler) AddUserInWorkspace(c echo.Context) err
 }
 
 func (workspaceHandler *WorkspaceHandler) AcceptInvite(c echo.Context) error {
+
 	param := models.AcceptInviteReqs{}
 	if err := c.Bind(&param); err != nil {
 		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: err.Error()})
@@ -93,7 +94,7 @@ func (workspaceHandler *WorkspaceHandler) AcceptInvite(c echo.Context) error {
 	}
 	param.UserID = userID
 	param.Email = email
-
+	fmt.Println("param user ", param)
 	if param.WorkspaceID == 0 {
 		return c.JSON(http.StatusBadRequest, models.BasicResp{Message: "invalid workspace id"})
 	}

@@ -148,15 +148,27 @@ func (c *WorkspaceService) AddUserInWorkspace(param models.AddUserInWorkspaceReq
 	if err != nil {
 		return models.BasicResp{}, err
 	}
-	manageWorkspaceParam := models.ManageWorkspace{
+
+	existing, err := c.ManageWorkspaceDomain.GetByWorkspaceIdAndUser(models.ManageWorkspace{
 		WorkspaceID:  param.WorkspaceID,
 		JoinedUserID: user.ID,
-		Role:         param.Role,
-		IsAccepted:   false,
-	}
-	_, err = c.ManageWorkspaceDomain.Create(manageWorkspaceParam)
-	if err != nil {
-		return models.BasicResp{}, err
+	})
+	if err == nil {
+		if existing.IsAccepted {
+			return models.BasicResp{}, fmt.Errorf("user is already a member of this workspace")
+		}
+		// pending invite — just resend the email, no new record needed
+	} else {
+		manageWorkspaceParam := models.ManageWorkspace{
+			WorkspaceID:  param.WorkspaceID,
+			JoinedUserID: user.ID,
+			Role:         param.Role,
+			IsAccepted:   false,
+		}
+		_, err = c.ManageWorkspaceDomain.Create(manageWorkspaceParam)
+		if err != nil {
+			return models.BasicResp{}, err
+		}
 	}
 	// ✅ generate JWT token
 	token, err := generateUserToken(int64(user.ID), user.Email)
@@ -197,7 +209,7 @@ func generateUserToken(userID int64, email string) (string, error) {
 
 func (c *WorkspaceService) AcceptInvite(param models.AcceptInviteReqs) (models.BasicResp, error) {
 	manageWorkspaceParam := models.ManageWorkspace{
-		WorkspaceID:  param.UserID,
+		WorkspaceID:  param.WorkspaceID,
 		JoinedUserID: param.UserID,
 	}
 	manageWorkspace, err := c.ManageWorkspaceDomain.GetByWorkspaceIdAndUserId(manageWorkspaceParam)
