@@ -246,20 +246,18 @@ func (g *GitHubRepositoryService) QueryWorkspace(param models.WorkspaceQueryRequ
 		return models.WorkspaceQueryResponse{}, fmt.Errorf("failed to classify query intent: %w", err)
 	}
 
-	var context string
 	switch intent {
 	case "code_explanation":
-		context = g.semantic_search(param.Query, workspaceID)
+		return g.semantic_search(param.Query, workspaceID)
 	case "get_commits_by_author_and_date":
-		author := param.Author
-		dateRange := param.DateRange
-		from, to := resolveDateRange(dateRange)
-		commits, _ := g.Domain.GetCommitsByAuthorAndDate(workspaceID, author, from, to)
-		context = buildCommitContext(commits)
+		fmt.Println("get_commits_by_author_and_date")
+		from, to := resolveDateRange(param.DateRange)
+		commits, _ := g.GitHubCommitsDomain.GetCommitsByAuthorAndDate(workspaceID, param.Author, from, to)
+		return g.generateCommitAnswer(param.Query, commits)
 	case "get_recent_commits":
 		from, _ := resolveDateRange(param.DateRange)
-		commits, _ := g.AiDomain.GetRecentCommits(workspaceID, from)
-		context = buildCommitContext(commits)
+		commits, _ := g.GitHubCommitsDomain.GetRecentCommitsByWorkspace(workspaceID, from)
+		return g.generateCommitAnswer(param.Query, commits)
 	default:
 		return models.WorkspaceQueryResponse{
 			Answer:      "Sorry, I can only answer questions related to code changes and commit history.",
@@ -267,17 +265,73 @@ func (g *GitHubRepositoryService) QueryWorkspace(param models.WorkspaceQueryRequ
 			Sources:     []models.WorkspaceQuerySource{},
 		}, nil
 	}
+}
 
-	answer, err := g.AiDomain.GenerateAnswer(query, context)
+func (g *GitHubRepositoryService) generateCommitAnswer(query string, commits []models.GitHubCommits) (models.WorkspaceQueryResponse, error) {
+	if len(commits) == 0 {
+		return models.WorkspaceQueryResponse{
+			Answer:      "No commits found matching your query.",
+			ActionItems: []string{},
+			Sources:     []models.WorkspaceQuerySource{},
+		}, nil
+	}
+
+	var sb strings.Builder
+	for i, c := range commits {
+		if i >= 20 {
+			break
+		}
+		sb.WriteString(fmt.Sprintf("Commit: %s\nAuthor: %s\nDate: %s\nMessage: %s\n\n",
+			c.CommitSHA, c.GithubAuthorName, c.CommittedAt.Format(time.RFC3339), c.CommitMessage))
+	}
+
+	systemPrompt := `You are an expert code analyst. Answer the user's question based on the provided commit history.
+Be concise and technical.
+You MUST respond with a valid JSON object (no markdown, no extra text) matching this schema:
+{
+  "answer": "<direct answer to the question>",
+  "action_items": ["<actionable step>", ...],
+  "code_patch": "",
+  "impact": "<brief impact summary>"
+}`
+	userPrompt := fmt.Sprintf("QUESTION: %s\n\nCOMMIT HISTORY:\n%s\n\nRespond ONLY with the JSON object.", query, sb.String())
+
+	raw, err := g.callAzureChatCompletion(systemPrompt, userPrompt)
 	if err != nil {
-		return models.WorkspaceQueryResponse{}, fmt.Errorf("failed to generate answer: %w", err)
+		return models.WorkspaceQueryResponse{}, fmt.Errorf("LLM call failed: %w", err)
+	}
+
+	var llmResp struct {
+		Answer      string   `json:"answer"`
+		ActionItems []string `json:"action_items"`
+		CodePatch   string   `json:"code_patch"`
+		Impact      string   `json:"impact"`
+	}
+	if err := json.Unmarshal([]byte(raw), &llmResp); err != nil {
+		llmResp.Answer = raw
+	}
+
+	var sources []models.WorkspaceQuerySource
+	seen := make(map[string]bool)
+	for _, c := range commits {
+		if len(sources) >= 3 {
+			break
+		}
+		if seen[c.CommitSHA] {
+			continue
+		}
+		seen[c.CommitSHA] = true
+		sources = append(sources, models.WorkspaceQuerySource{
+			CommitSHA: c.CommitSHA,
+		})
 	}
 
 	return models.WorkspaceQueryResponse{
-		Answer:      answer.Answer,
-		ActionItems: answer.ActionItems,
-		CodePatch:   answer.CodePatch,
-		Impact:      answer.Impact,
+		Answer:      llmResp.Answer,
+		ActionItems: llmResp.ActionItems,
+		CodePatch:   llmResp.CodePatch,
+		Impact:      llmResp.Impact,
+		Sources:     sources,
 	}, nil
 }
 

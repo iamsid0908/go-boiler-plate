@@ -7,6 +7,7 @@ type User struct {
 	Email     string    `gorm:"column:email;unique"`
 	Password  *string   `gorm:"column:password"`
 	Name      string    `gorm:"column:name"`
+	Username  string    `gorm:"column:username"`
 	Role      string    `gorm:"column:role"`
 	Language  string    `gorm:"column:language"`
 	IsActive  bool      `gorm:"column:is_active;default:false"`

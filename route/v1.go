@@ -19,6 +19,8 @@ func v1Routes(g *echo.Group, h AppModel) {
 	auth.GET("/github/callback", h.Auth.GithubOAuthCallback, middleware.JWTVerify())
 	auth.GET("/google", h.Auth.GoogleAuthURL)
 	auth.GET("/google/callback", h.Auth.GoogleOAuthCallback)
+	auth.GET("/github", h.Auth.GithubAuthURL)
+	auth.GET("/github/callback", h.Auth.GithubAuthCallback)
 
 	user := g.Group("/user", middleware.JWTVerify())
 	user.GET("/get-user", h.User.GetUserName)
