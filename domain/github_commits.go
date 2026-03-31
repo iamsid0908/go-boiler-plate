@@ -134,7 +134,7 @@ func (g *GitHubCommitsDomainCtx) GetCommitsByAuthorAndDate(workspaceID int64, au
 	err := db.Table("git_hub_commits c").
 		Joins("JOIN git_hub_repository gr ON gr.id = c.github_repository_id").
 		Joins("JOIN github_installations gi ON gi.installation_id = gr.installation_id").
-		Where("gi.workspace_id = ? AND c.github_author_name = ? AND c.committed_at BETWEEN ? AND ?", workspaceID, author, from, to).
+		Where("gi.workspace_id = ? AND c.author_email = ? AND c.committed_at BETWEEN ? AND ?", workspaceID, author, from, to).
 		Order("c.committed_at DESC").
 		Find(&commits).Error
 

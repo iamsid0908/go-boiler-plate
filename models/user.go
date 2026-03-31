@@ -49,10 +49,10 @@ type ListOfUser struct {
 }
 type UpdateUserParam struct {
 	UserID   int64  `json:"user_id"`
-	Email    string `json:"email"`
 	Name     string `json:"name"`
 	Role     string `json:"role"`
 	Language string `json:"language"`
+	Username string `json:"username"`
 }
 
 type UserDataResponse struct {
@@ -61,6 +61,7 @@ type UserDataResponse struct {
 	Name      string    `json:"name"`
 	Role      string    `json:"roles"`
 	Language  string    `json:"language"`
+	Username  string    `json:"username"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }

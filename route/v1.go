@@ -24,6 +24,7 @@ func v1Routes(g *echo.Group, h AppModel) {
 
 	user := g.Group("/user", middleware.JWTVerify())
 	user.GET("/get-user", h.User.GetUserName)
+	user.POST("/update-profile", h.User.UpdateUserProfile)
 
 	workspace := g.Group("/workspace", middleware.JWTVerify())
 	workspace.POST("/create", h.Workspace.CreateWorkspace)

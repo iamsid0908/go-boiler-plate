@@ -1,16 +1,12 @@
 package service
 
 import (
-	"bytes"
 	"context"
-	"core/config"
 	"core/domain"
 	"core/models"
 	"core/queue"
 	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -129,7 +125,7 @@ func (g *GitHubRepositoryService) ExplainCommitFileChange(param models.ExplainCo
 	estimatedTokens := (len(systemPrompt) + len(userPrompt)) / 4
 	fmt.Printf("Estimated tokens: %d\n", estimatedTokens)
 
-	aiResponse, err := g.callAIService(systemPrompt, userPrompt)
+	aiResponse, err := g.AiDomain.CallAzureChatCompletion(systemPrompt, userPrompt)
 	if err != nil {
 		return models.ExplainCommitFileChangeResponse{}, fmt.Errorf("AI service error: %w", err)
 	}
@@ -143,43 +139,6 @@ func (g *GitHubRepositoryService) ExplainCommitFileChange(param models.ExplainCo
 	}
 
 	return response, nil
-}
-
-func (g *GitHubRepositoryService) callAIService(systemPrompt, userPrompt string) (string, error) {
-	aiServiceURL := config.GetConfig().AiBackendUrl + "/explain-commit-file-change"
-
-	// Prepare request payload
-	requestBody := map[string]string{
-		"systemPrompt": systemPrompt,
-		"userPrompt":   userPrompt,
-	}
-
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	// Make HTTP POST request
-	resp, err := http.Post(aiServiceURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("failed to call AI service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("AI service returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Read response body
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
-
-	// Return the response as string (assuming the AI service returns plain text)
-	return string(body), nil
 }
 
 func (g *GitHubRepositoryService) buildRelatedFilesContext(relatedFiles []models.RelatedCommitFileResponse) (string, error) {
@@ -296,7 +255,7 @@ You MUST respond with a valid JSON object (no markdown, no extra text) matching 
 }`
 	userPrompt := fmt.Sprintf("QUESTION: %s\n\nCOMMIT HISTORY:\n%s\n\nRespond ONLY with the JSON object.", query, sb.String())
 
-	raw, err := g.callAzureChatCompletion(systemPrompt, userPrompt)
+	raw, err := g.AiDomain.CallAzureChatCompletion(systemPrompt, userPrompt)
 	if err != nil {
 		return models.WorkspaceQueryResponse{}, fmt.Errorf("LLM call failed: %w", err)
 	}
@@ -311,6 +270,7 @@ You MUST respond with a valid JSON object (no markdown, no extra text) matching 
 		llmResp.Answer = raw
 	}
 
+	repoCache := make(map[int64]string)
 	var sources []models.WorkspaceQuerySource
 	seen := make(map[string]bool)
 	for _, c := range commits {
@@ -321,8 +281,16 @@ You MUST respond with a valid JSON object (no markdown, no extra text) matching 
 			continue
 		}
 		seen[c.CommitSHA] = true
+		repoName := repoCache[c.GithubRepositoryID]
+		if repoName == "" {
+			if repo, err := g.GitHubRepositoryDomain.GetByID(c.GithubRepositoryID); err == nil {
+				repoName = repo.Name
+				repoCache[c.GithubRepositoryID] = repoName
+			}
+		}
 		sources = append(sources, models.WorkspaceQuerySource{
 			CommitSHA: c.CommitSHA,
+			RepoName:  repoName,
 		})
 	}
 
@@ -391,7 +359,7 @@ COMMIT HISTORY CONTEXT:
 Respond ONLY with the JSON object described in the system prompt.`, query, context)
 
 	// 5. Call LLM
-	raw, err := g.callAzureChatCompletion(systemPrompt, userPrompt)
+	raw, err := g.AiDomain.CallAzureChatCompletion(systemPrompt, userPrompt)
 	if err != nil {
 		return models.WorkspaceQueryResponse{}, fmt.Errorf("LLM call failed: %w", err)
 	}
@@ -457,37 +425,6 @@ Patch:
 		sb.WriteString(entry)
 	}
 	return sb.String()
-}
-
-func (g *GitHubRepositoryService) callAzureChatCompletion(systemPrompt, userPrompt string) (string, error) {
-	aiServiceURL := config.GetConfig().AiBackendUrl + "/explain-commit-file-change"
-
-	requestBody := map[string]string{
-		"systemPrompt": systemPrompt,
-		"userPrompt":   userPrompt,
-	}
-	jsonData, err := json.Marshal(requestBody)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal request: %w", err)
-	}
-
-	resp, err := http.Post(aiServiceURL, "application/json", bytes.NewBuffer(jsonData))
-	if err != nil {
-		return "", fmt.Errorf("failed to call AI service: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("AI service returned status %d: %s", resp.StatusCode, string(body))
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read AI service response: %w", err)
-	}
-
-	return string(body), nil
 }
 
 func (g *GitHubRepositoryService) buildUserPrompt(mainCommitFile models.GitHubCommitFiles, relatedFilesContext string, relatedCount int, question string) string {
