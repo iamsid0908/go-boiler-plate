@@ -1,7 +1,6 @@
 package main
 
 import (
-	"core/config"
 	"core/route"
 	"log"
 
@@ -18,7 +17,7 @@ func main() {
 	}
 
 	// Middleware
-	config.DbInit()
+	// config.DbInit()
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
 	e = route.InitHttp()
