@@ -1,7 +1,6 @@
 package route
 
 import (
-	"core/config"
 	"core/domain"
 	"core/handler"
 	"core/service"
@@ -14,13 +13,6 @@ type AppModel struct {
 }
 
 func App() AppModel {
-	// Initialize queue client
-	cfg := config.GetConfig()
-	redisAddr := cfg.RedisAddr
-	if redisAddr == "" {
-		redisAddr = "localhost:6379" // default
-	}
-
 	//domain
 	healthDomain := &domain.HealthDomainCtx{}
 	authDomain := &domain.AuthDomainCtx{}

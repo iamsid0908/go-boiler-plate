@@ -10,7 +10,6 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/labstack/echo"
@@ -380,27 +379,3 @@ func (authHandler *AuthHandler) GithubAuthCallback(c echo.Context) error {
 	return c.Redirect(http.StatusTemporaryRedirect, frontendURL+data.Redirect)
 }
 
-func (authHandler *AuthHandler) GithubOAuthCallback(c echo.Context) error {
-	installationID := c.QueryParam("installation_id")
-	setupAction := c.QueryParam("setup_action")
-
-	if installationID == "" {
-		return c.JSON(400, models.BasicResp{Message: "installation_id is required"})
-	}
-
-	// Get user ID from JWT token (set by middleware)
-	userID := c.Get("user_id") // Adjust based on your JWT middleware implementation
-	fmt.Println("User ID from token:", userID)
-	fmt.Println("Installation ID:", installationID)
-	fmt.Println("Setup Action:", setupAction)
-	// Store installation in DB via service
-	// err := connectOrgHandler.ConnectOrgService.StoreInstallation(userID, installationID, setupAction)
-	// if err != nil {
-	// 	return c.JSON(500, models.BasicResp{Message: "Failed to store installation: " + err.Error()})
-	// }
-
-	resp := models.BasicResp{
-		Message: "Installation successful",
-		Data:    map[string]string{"installation_id": installationID}}
-	return c.JSON(200, resp)
-}

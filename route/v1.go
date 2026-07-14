@@ -16,7 +16,6 @@ func v1Routes(g *echo.Group, h AppModel) {
 	auth.POST("/login", h.Auth.LoginUser)
 	auth.GET("/validate", h.Auth.ValidateSession, middleware.JWTVerify())
 	auth.GET("/logout", h.Auth.UserLogOut, middleware.JWTVerify())
-	auth.GET("/github/callback", h.Auth.GithubOAuthCallback, middleware.JWTVerify())
 	auth.GET("/google", h.Auth.GoogleAuthURL)
 	auth.GET("/google/callback", h.Auth.GoogleOAuthCallback)
 	auth.GET("/github", h.Auth.GithubAuthURL)

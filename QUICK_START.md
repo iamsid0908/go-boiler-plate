@@ -50,9 +50,7 @@ axios.defaults.withCredentials = true; // CRITICAL!
 - `GET /api/v1/auth/validate` - Check session validity
 - `GET /api/v1/auth/logout` - Logout (clears cookie)
 - `GET /api/v1/user/get-user` - Get user info
-- `GET /api/v1/books/*` - All book endpoints
-- `GET /api/v1/cart/*` - All cart endpoints
-- All other routes with middleware.JWTVerify()
+- Any route registered with middleware.JWTVerify()
 
 ---
 
@@ -70,8 +68,8 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 curl -X GET http://localhost:8080/api/v1/auth/validate \
   -b cookies.txt
 
-# Access protected route
-curl -X GET http://localhost:8080/api/v1/books/getall \
+# Access a protected route
+curl -X GET http://localhost:8080/api/v1/user/get-user \
   -b cookies.txt
 
 # Logout
@@ -152,7 +150,7 @@ REACT_APP_API_URL=https://api.yourdomain.com/api/v1
 ### Authenticated Requests
 ```
 1. User makes request
-   Browser → GET /books/getall
+   Browser → GET /user/get-user
 
 2. Browser automatically sends cookie
    Headers: Cookie: Bearer=<token>
